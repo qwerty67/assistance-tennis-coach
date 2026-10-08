@@ -1,0 +1,356 @@
+# Codebase Rules & Standards (.agentrules)
+
+This document is the authoritative coding style, syntax habit, and architectural standard for both the React Native (Expo) client and Python (FastAPI) backend. All new code and refactors must strictly adhere to these patterns.
+
+---
+
+## 1. React Native (Client) Standards
+
+### 1.1 Architecture & Directory Layout
+- **Path Aliases**: `@/*` maps to `./src/*`. Never use deep relative imports (`../../..`).
+- **Feature Folders** (`src/features/<feature>/`):
+  - `api.ts`: API endpoints (`<feature>Api` object) and TanStack React Query hooks (`use<Entities>`, `use<Entity>`, `useSave<Entity>`, `useDelete<Entity>`).
+  - `schemas.ts`: Zod validation schemas for forms.
+  - `components/`: Feature-specific UI components.
+  - `screens/`: Named export screens (e.g., `export function StudentDetailScreen()`).
+- **Expo Router Routes** (`src/app/`):
+  - Thin wrappers using default export that render feature screens or `<Stack>` / `<Tabs>`.
+  - Group layouts with parenthesis: `(auth)`, `(tabs)`.
+- **Shared Modules** (`src/shared/`):
+  - `components/`: Design system primitives (`Screen`, `Header`, `Card`, `Button`, `AppText`, `Badge`, `TextField`, etc.).
+  - `hooks/`: Shared custom hooks (`useDirection`, `useFeedback`, `useRefresh`, `useDebounce`).
+  - `services/`: Axios HTTP client (`apiClient`), React Query (`queryClient`), config (`config`), storage (`storage`).
+  - `theme/`: Theme design tokens (`colors`, `spacing`, `radii`, `typography`).
+  - `utils/`: Formatters (`formatMoney`, `digits`, `formatDate`), errors (`errorMessage`), confirm dialogs (`confirm`).
+
+### 1.2 Component & Screen Conventions
+- **Component Declarations**: Always use named function declarations (`export function ComponentName(props: Props)`). Use `export default function` only for `src/app/` route pages.
+- **Strict Hook & State Ordering**:
+  1. Translation hook: `const { t } = useTranslation();`
+  2. Route parameters: `const { id } = useLocalSearchParams<{ id: string }>();`
+  3. Server queries: `const { data, isLoading, error, refetch } = useEntity(id);`
+  4. Server mutations: `const save = useSaveEntity();`
+  5. UI hooks: `const fb = useFeedback();`, `const { refreshing, onRefresh } = useRefresh(...);`
+  6. Local state: `const [state, setState] = useState<Type>(initial);`
+  7. Form hooks: `const { control, handleSubmit } = useForm<FormInput>({ resolver: zodResolver(...) });`
+  8. Computed / derived values: `const isReady = ...;`
+  9. Action handlers / callbacks: `const onSubmit = async (...) => { ... };`
+  10. Conditional early returns: `if (isLoading) return <LoadingView />;`
+  11. Render JSX wrapped in `<Screen>` or layout container.
+
+### 1.3 Styling, Layout & RTL
+- **StyleSheet Only**: Never use Tailwind or NativeWind. Always use `StyleSheet.create({ ... })` positioned at the bottom of the file.
+- **Design Tokens**: Always consume `colors`, `spacing`, `radii`, `typography` from `@/shared/theme`.
+- **Screen Container**: Every screen renders inside `<Screen header={<Header ... />} refreshing={refreshing} onRefresh={onRefresh}>`.
+  - Provides `SafeAreaView` (`edges={['top']}` by default).
+  - Handles `KeyboardAvoidingView` (`Platform.OS === 'ios' ? 'padding' : undefined`).
+  - Provides ScrollView with `keyboardShouldPersistTaps="handled"`.
+- **Platform Branching**: Inline `Platform.OS === 'web'` or `Platform.OS === 'ios'`. Never use `.android.tsx` / `.ios.tsx` file extensions unless platform native modules strictly require it.
+- **RTL & Typography**:
+  - Fonts: Persian `Vazirmatn` font family (`Vazirmatn_400Regular`, `500Medium`, `700Bold`, `800ExtraBold`).
+  - Native RTL forced via `I18nManager.forceRTL(true)`.
+  - Text rendered via `<AppText variant="h1"|"h2"|"h3"|"body"|"bodyMedium"|"small"|"caption">`.
+
+### 1.4 State & Networking
+- **Global State**: Zustand stores in `src/features/<feature>/store.ts` (e.g., `useAuth = create<AuthState>((set, get) => ({ ... }))`).
+- **Server State**: `@tanstack/react-query`.
+  - Query keys defined via centralized `qk` helper in `@/shared/services/queryClient`.
+  - Mutations invalidate relevant query keys and `invalidateOperational()` on success.
+- **HTTP Client**: Axios instance in `@/shared/services/apiClient`.
+  - Methods: `api.get`, `api.post`, `api.put`, `patch`, `delete`.
+  - Interceptors handle automatic `Authorization: Bearer <token>` injection and concurrent silent refresh.
+- **Offline & Persistence**:
+  - Sensitive tokens: `secureStorage` (`expo-secure-store`, falling back to `AsyncStorage` on web).
+  - Non-sensitive data / offline queue: `storage` (`AsyncStorage`).
+  - Offline mutation outbox synced via `startOutboxSync()` in `@/shared/services/offline/outbox`.
+
+### 1.5 Client Code Skeletons
+
+#### Screen Skeleton
+```tsx
+import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { useEntity, useSaveEntity } from '../api';
+import {
+  AppText, Button, Card, Header, IconButton, LoadingView,
+  Screen, SectionHeader
+} from '@/shared/components';
+import { colors, spacing } from '@/shared/theme';
+import { useFeedback } from '@/shared/hooks/useFeedback';
+import { useRefresh } from '@/shared/hooks/useRefresh';
+import { errorMessage } from '@/shared/utils/errors';
+
+export function EntityDetailScreen() {
+  const { t } = useTranslation();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data, isLoading, error, refetch } = useEntity(id);
+  const save = useSaveEntity(id);
+  const fb = useFeedback();
+  const { refreshing, onRefresh } = useRefresh(refetch);
+  const [tab, setTab] = useState<'info' | 'activity'>('info');
+
+  if (isLoading) return <LoadingView />;
+  if (error || !data) return null;
+
+  const onAction = async () => {
+    try {
+      await save.mutateAsync({ status: 'active' });
+      fb.success(t('common.saved'));
+    } catch (e) {
+      fb.error(errorMessage(e));
+    }
+  };
+
+  return (
+    <Screen
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      header={
+        <Header
+          back
+          title={data.title}
+          right={<IconButton icon="pencil-outline" onPress={() => router.push(`/coach/entity/form?id=${id}`)} />}
+        />
+      }
+    >
+      <Card>
+        <AppText variant="h2">{data.title}</AppText>
+        <Button title={t('common.save')} onPress={onAction} />
+      </Card>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: { gap: spacing.md },
+});
+```
+
+#### Feature API & React Query Hook Skeleton
+```tsx
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { api } from '@/shared/services/apiClient';
+import { invalidateOperational, qk, queryClient } from '@/shared/services/queryClient';
+import type { Entity, EntityInput } from '@/shared/types/api';
+
+export const entityApi = {
+  list: (params?: object) => api.get<Entity[]>('/entities', params),
+  get: (id: string) => api.get<Entity>(`/entities/${id}`),
+  create: (body: EntityInput) => api.post<Entity>('/entities', body),
+  update: (id: string, body: EntityInput) => api.put<Entity>(`/entities/${id}`, body),
+  remove: (id: string) => api.delete(`/entities/${id}`),
+};
+
+export const useEntities = (params?: object) =>
+  useQuery({ queryKey: ['entities', params], queryFn: () => entityApi.list(params) });
+
+export const useEntity = (id: string) =>
+  useQuery({ queryKey: ['entities', id], queryFn: () => entityApi.get(id), enabled: !!id });
+
+const refresh = () => {
+  queryClient.invalidateQueries({ queryKey: ['entities'] });
+  return invalidateOperational();
+};
+
+export const useSaveEntity = (id?: string) =>
+  useMutation({
+    mutationFn: (body: EntityInput) => (id ? entityApi.update(id, body) : entityApi.create(body)),
+    onSuccess: refresh,
+  });
+```
+
+---
+
+## 2. Python (Backend) Standards
+
+### 2.1 Architecture & Layer Responsibilities
+- **Framework**: FastAPI application with factory pattern `create_app()` in `app/main.py`.
+- **Layer Separation**:
+  - `app/api/v1/routers/`: HTTP presentation. Validates requests via Pydantic, extracts `Actor` (`get_current_actor`) and `db: Session` (`get_db`), delegates all logic to services.
+  - `app/application/services/`: Application workflows, permission enforcement, multi-model transactions, triggering notifications.
+  - `app/application/schemas/`: Pydantic v2 DTOs (Request / Response validation).
+  - `app/domain/`: Pure business logic, pricing computations, slot schedule generators, attendance rules, Jalali date logic. **Zero database or framework imports.**
+  - `app/infrastructure/db/models/`: Declarative SQLAlchemy 2.0 ORM models.
+  - `app/infrastructure/repositories/`: Common data access (`Repository(db)` with `get_owned`).
+
+### 2.2 Python Idioms & Syntax Habits
+- **Annotation Deferral**: Always add `from __future__ import annotations` at the top of service and model files. This prevents name collisions when methods named `list` shadow the Python builtin `list` inside class bodies.
+- **Type Annotations**: Comprehensive type annotations on all parameters and return values (`actor: Actor, db: Session -> dict`).
+- **Sync Route Handlers & SQLAlchemy Sessions**: FastAPI endpoints and service methods use standard sync `def` and SQLAlchemy 2.0 `Session`. FastAPI automatically runs sync route handlers inside an `anyio` threadpool worker, avoiding async greenlet context issues.
+- **Actor Context Injection**: All coach/student endpoints inject `actor: Actor = Depends(get_current_actor)`. `Actor` provides `actor.coach_id`, `actor.user`, `actor.today()`, `actor.tz`.
+
+### 2.3 Database & SQLAlchemy 2.0 Conventions
+- **Declarative Base & Mixins**:
+  - `UUIDPkMixin`: `id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)`.
+  - `TimestampMixin`: `created_at: Mapped[datetime]`, `updated_at: Mapped[datetime]`.
+  - `SyncMixin`: `version: Mapped[int] = mapped_column(default=1)`, `deleted_at: Mapped[datetime | None]`.
+- **Query Style**: SQLAlchemy 2.0 executable select statements (`select(Model).where(...)`, `db.scalars(stmt)`, `db.get(Model, id)`).
+- **Session Lifecycle**: Injected via `db: Session = Depends(get_db)`. Transactions committed in services (`db.commit()`), flushed before dependent queries (`db.flush()`).
+
+### 2.4 Error Handling & HTTP Responses
+- **AppError Hierarchy** (`app/core/exceptions.py`):
+  - `AppError(message, code, status_code, details)`
+  - `NotFoundError` (404), `ValidationError` (422), `AuthError` (401), `ForbiddenError` (403), `ConflictError` (409).
+- **Uniform Error Envelope**:
+  ```json
+  {
+    "error": {
+      "code": "validation_error",
+      "message": "Invalid input",
+      "details": []
+    }
+  }
+  ```
+
+### 2.5 Backend Code Skeletons
+
+#### Router Skeleton
+```python
+from __future__ import annotations
+
+import uuid
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+
+from app.api.dependencies import get_current_actor, get_db
+from app.application.context import Actor
+from app.application.schemas.entity import EntityCreate, EntityOut, EntityUpdate
+from app.application.services.entity_service import EntityService
+
+router = APIRouter(prefix="/entities", tags=["entities"])
+
+
+@router.get("", response_model=list[EntityOut])
+def list_entities(actor: Actor = Depends(get_current_actor), db: Session = Depends(get_db)):
+    return EntityService(db).list(actor)
+
+
+@router.get("/{entity_id}", response_model=EntityOut)
+def get_entity(entity_id: uuid.UUID, actor: Actor = Depends(get_current_actor), db: Session = Depends(get_db)):
+    return EntityService(db).get(actor, entity_id)
+
+
+@router.post("", response_model=EntityOut, status_code=status.HTTP_201_CREATED)
+def create_entity(data: EntityCreate, actor: Actor = Depends(get_current_actor), db: Session = Depends(get_db)):
+    return EntityService(db).create(actor, data)
+
+
+@router.put("/{entity_id}", response_model=EntityOut)
+def update_entity(entity_id: uuid.UUID, data: EntityUpdate, actor: Actor = Depends(get_current_actor), db: Session = Depends(get_db)):
+    return EntityService(db).update(actor, entity_id, data)
+
+
+@router.delete("/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_entity(entity_id: uuid.UUID, actor: Actor = Depends(get_current_actor), db: Session = Depends(get_db)):
+    EntityService(db).delete(actor, entity_id)
+```
+
+#### Application Service Skeleton
+```python
+from __future__ import annotations
+
+import uuid
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.application.context import Actor
+from app.application.schemas.entity import EntityCreate, EntityUpdate
+from app.core.exceptions import NotFoundError, ValidationError
+from app.infrastructure.db.models import EntityModel
+from app.infrastructure.repositories.base import Repository
+
+
+class EntityService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.repo = Repository(db)
+
+    def to_out(self, e: EntityModel) -> dict:
+        return {
+            "id": e.id,
+            "coach_id": e.coach_id,
+            "title": e.title,
+            "status": e.status,
+            "created_at": e.created_at,
+        }
+
+    def list(self, actor: Actor) -> list[dict]:
+        stmt = select(EntityModel).where(EntityModel.coach_id == actor.coach_id, EntityModel.deleted_at.is_(None))
+        return [self.to_out(e) for e in self.db.scalars(stmt.order_by(EntityModel.created_at.desc()))]
+
+    def get(self, actor: Actor, entity_id: uuid.UUID) -> dict:
+        return self.to_out(self.repo.get_owned(EntityModel, entity_id, actor.coach_id))
+
+    def create(self, actor: Actor, data: EntityCreate) -> dict:
+        e = EntityModel(coach_id=actor.coach_id, **data.model_dump())
+        self.db.add(e)
+        self.db.commit()
+        self.db.refresh(e)
+        return self.to_out(e)
+
+    def update(self, actor: Actor, entity_id: uuid.UUID, data: EntityUpdate) -> dict:
+        e = self.repo.get_owned(EntityModel, entity_id, actor.coach_id)
+        for k, v in data.model_dump(exclude_unset=True).items():
+            setattr(e, k, v)
+        self.db.commit()
+        return self.to_out(e)
+
+    def delete(self, actor: Actor, entity_id: uuid.UUID) -> None:
+        e = self.repo.get_owned(EntityModel, entity_id, actor.coach_id)
+        e.deleted_at = actor.today()
+        self.db.commit()
+```
+
+#### SQLAlchemy Model Skeleton
+```python
+from __future__ import annotations
+
+import uuid
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.domain.enums import EntityStatus
+from app.infrastructure.db.base import Base
+from app.infrastructure.db.types import SyncMixin, TimestampMixin, UUIDPkMixin
+
+
+class EntityModel(UUIDPkMixin, TimestampMixin, SyncMixin, Base):
+    __tablename__ = "entities"
+
+    coach_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("coaches.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    status: Mapped[EntityStatus] = mapped_column(default=EntityStatus.ACTIVE)
+
+    coach: Mapped[Coach] = relationship(back_populates="entities")
+```
+
+---
+
+## 3. Cross-Stack Contracts
+
+- **Universal Naming**: Use `snake_case` consistently across both client and backend for JSON payload keys, DTO property names, database columns, and TypeScript interfaces (`first_name`, `last_name`, `session_price`, `start_at`, `end_at`).
+- **Response Format**:
+  - Success responses return the raw entity or array directly (`r.data`). Do not wrap in `{ "data": ... }`.
+  - Error responses strictly return `{ "error": { "code": string, "message": string, "details": any } }`.
+- **Authentication**:
+  - Access Token: JWT Bearer in header `Authorization: Bearer <token>`.
+  - Refresh Token: Long-lived token with rotated UUID `jti` persisted in DB.
+  - Client performs automatic silent renewal on 401 response and clears secure storage on auth failure.
+- **Timezone & Calendar Standards**:
+  - Backend persists all timestamps aware in UTC (`datetime.now(timezone.utc)`).
+  - Business calendar operations and session generation use the coach's local timezone (e.g. `"Asia/Tehran"` via `zoneinfo.ZoneInfo`) with standard Iran/Tehran time (+03:30, no DST).
+  - Jalali calendar conversions handled purely via `app.domain.jalali`.
+
+---
+
+## 4. Testing & Verification
+
+- **Backend Test Suite**:
+  - Executable: `backend/.venv/Scripts/pytest.exe`
+  - All tests must pass: `test_domain.py` and `test_workflows.py`.
+  - SQLite in-memory or temp file fixture with `autouse=True` reset (`fresh_db`).
+- **Client Test & Type-Checking**:
+  - Executable: `npm run typecheck` (`tsc --noEmit` from `mobile/`).
+  - Zero TypeScript compiler errors required.

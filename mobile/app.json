@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "مربی تنیس",
+    "slug": "tennis-coach",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ir.tenniscoach.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1F3A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "ir.tenniscoach.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0B1F3A"
+        }
+      ],
+      "expo-font"
+    ],
+    "scheme": "tenniscoach",
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "supportsRTL": true,
+      "forcesRTL": true,
+      "apiUrl": ""
+    }
+  }
+}
