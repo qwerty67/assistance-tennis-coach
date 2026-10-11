@@ -3,11 +3,12 @@ import { Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useChangePassword, useCoachSettings, useSaveSettings } from '../api';
+import { useCurrentSubscription } from '@/features/subscription/api';
 import { useAuth } from '@/features/auth/store';
 import { ServerSettings } from '@/features/auth/components/ServerSettings';
-import { AppText, Avatar, Button, Card, Chips, Header, ListRow, Screen, SectionHeader, Sheet, TextField } from '@/shared/components';
-import { colors, spacing } from '@/shared/theme';
-import { digits } from '@/shared/utils/format';
+import { AppText, Avatar, Badge, Button, Card, Chips, Header, ListRow, Screen, SectionHeader, Sheet, TextField } from '@/shared/components';
+import { colors, palette, spacing } from '@/shared/theme';
+import { digits, formatDate } from '@/shared/utils/format';
 import { useFeedback } from '@/shared/hooks/useFeedback';
 import { errorMessage } from '@/shared/utils/errors';
 import { confirm } from '@/shared/utils/confirm';
@@ -21,6 +22,7 @@ export function ProfileScreen() {
   const { user, logout } = useAuth();
   const coach = user?.role === 'coach';
   const settings = useCoachSettings();
+  const currentSub = useCurrentSubscription(coach);
   const saveSettings = useSaveSettings();
   const changePw = useChangePassword();
   const fb = useFeedback();
@@ -47,6 +49,38 @@ export function ProfileScreen() {
 
       {coach ? (
         <>
+          <SectionHeader title={t('subscription.currentPlan')} />
+          <Card style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="h3">
+                  {currentSub.data?.is_active ? currentSub.data.title : t('subscription.noActiveSubscription')}
+                </AppText>
+                <AppText variant="caption" muted>
+                  {currentSub.data?.is_active
+                    ? t('subscription.activeUntil', { date: currentSub.data.expires_at ? formatDate(currentSub.data.expires_at) : '-' })
+                    : t('subscription.expired')}
+                </AppText>
+              </View>
+              {currentSub.data?.is_active ? (
+                <Badge
+                  label={t('subscription.daysRemaining', { n: digits(currentSub.data.days_left ?? 0) })}
+                  color={colors.primaryDark}
+                  bg={colors.primarySoft}
+                />
+              ) : (
+                <Badge label={t('subscription.expired')} color={palette.red500} bg={palette.red100} />
+              )}
+            </View>
+            <Button
+              title={currentSub.data?.is_active ? t('subscription.upgradePlan') : t('subscription.extendOrUpgrade')}
+              variant="outline"
+              size="sm"
+              icon="medal-outline"
+              onPress={() => router.push('/coach/subscription')}
+            />
+          </Card>
+
           <SectionHeader title={t('profile.tools')} />
           <Card padded={false} style={{ paddingHorizontal: spacing.lg }}>
             <ListRow icon="clipboard-text-outline" title={t('training.title')} onPress={() => router.push('/coach/training')} divider />

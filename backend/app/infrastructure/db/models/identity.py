@@ -1,10 +1,10 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, Enum, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.enums import UserRole
+from app.domain.enums import SubscriptionStatus, UserRole
 from app.infrastructure.db.base import Base, TimestampMixin, UUIDPkMixin
 from app.infrastructure.db.types import UTCDateTime
 
@@ -32,6 +32,31 @@ class User(UUIDPkMixin, TimestampMixin, Base):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
+    @property
+    def has_active_subscription(self) -> bool:
+        if self.role != UserRole.COACH:
+            return True
+        if not self.coach_profile:
+            return False
+        now = datetime.now(timezone.utc)
+        for s in self.coach_profile.subscriptions:
+            if s.status == SubscriptionStatus.ACTIVE and s.expires_at > now:
+                return True
+        return False
+
+    @property
+    def subscription_expires_at(self) -> datetime | None:
+        if self.role != UserRole.COACH or not self.coach_profile:
+            return None
+        now = datetime.now(timezone.utc)
+        active = [
+            s for s in self.coach_profile.subscriptions
+            if s.status == SubscriptionStatus.ACTIVE and s.expires_at > now
+        ]
+        if not active:
+            return None
+        return max(s.expires_at for s in active)
+
 
 class Academy(UUIDPkMixin, TimestampMixin, Base):
     """Reserved for multi-coach academies / clubs / branches (future)."""
@@ -56,6 +81,9 @@ class Coach(UUIDPkMixin, TimestampMixin, Base):
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
 
     user: Mapped[User] = relationship(back_populates="coach_profile")
+    subscriptions: Mapped[list["CoachSubscription"]] = relationship(
+        "CoachSubscription", back_populates="coach", cascade="all, delete-orphan", order_by="desc(CoachSubscription.created_at)"
+    )  # noqa: F821
 
 
 class RefreshToken(UUIDPkMixin, TimestampMixin, Base):

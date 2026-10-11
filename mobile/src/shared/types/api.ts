@@ -17,8 +17,19 @@ export type Intensity = 'low' | 'medium' | 'high' | 'max';
 export type ExerciseStatus = 'todo' | 'in_progress' | 'done';
 export type PlanStatus = 'draft' | 'active' | 'completed' | 'archived';
 
+export type SubscriptionTier = '1_month' | '3_months' | '6_months';
+export type SubscriptionStatus = 'active' | 'expired' | 'pending' | 'cancelled';
+
 export interface User {
-  id: UUID; first_name: string; last_name: string; email: string; phone: string; role: Role; locale: string;
+  id: UUID;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  role: Role;
+  locale: string;
+  has_active_subscription?: boolean;
+  subscription_expires_at?: string | null;
 }
 export interface TokenPair { access_token: string; refresh_token: string; expires_in: number; user: User }
 
@@ -138,3 +149,34 @@ export interface StudentDashboard {
   recent_payments: Payment[]; training_plans: TrainingPlan[]; session_history: Session[]; unread_notifications: number;
 }
 export interface CoachSettings { charge_rules: Record<AttendanceStatus, boolean>; reminder_hours: number; timezone: string; currency: string; bio?: string | null }
+
+export interface SubscriptionPlan {
+  id: string;
+  tier: SubscriptionTier;
+  title: string;
+  duration_days: number;
+  duration_months: number;
+  price: number;
+  original_price: number;
+  discount_percent: number;
+  is_popular: boolean;
+  badge?: string | null;
+  features: string[];
+}
+
+export interface CoachSubscriptionStatus {
+  is_active: boolean;
+  tier?: SubscriptionTier | null;
+  title?: string | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
+  days_left?: number | null;
+  payment_reference?: string | null;
+  status?: SubscriptionStatus | null;
+}
+
+export interface SubscribeResult {
+  success: boolean;
+  subscription: CoachSubscriptionStatus;
+  message: string;
+}

@@ -169,3 +169,16 @@ class NotificationType(StrEnum):
     PAYMENT_RECORDED = "payment_recorded"
     TRAINING_PLAN = "training_plan"
     GENERAL = "general"
+
+
+class SubscriptionTier(StrEnum):
+    ONE_MONTH = "1_month"
+    THREE_MONTHS = "3_months"
+    SIX_MONTHS = "6_months"
+
+
+class SubscriptionStatus(StrEnum):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    PENDING = "pending"
+    CANCELLED = "cancelled"

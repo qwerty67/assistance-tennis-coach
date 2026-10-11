@@ -22,9 +22,13 @@ export function RegisterScreen() {
   });
   const onSubmit = handleSubmit(async (v) => {
     try {
-      await register(registerSchema.parse(v));
+      const newUser = await register(registerSchema.parse(v));
       fb.success(t('auth.registered'));
-      router.replace('/');
+      if (newUser.role === 'coach') {
+        router.replace('/coach/subscription');
+      } else {
+        router.replace('/');
+      }
     } catch (e) {
       fb.error(errorMessage(e));
     }

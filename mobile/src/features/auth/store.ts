@@ -17,6 +17,8 @@ interface AuthState {
   register: (p: RegisterPayload) => Promise<User>;
   logout: () => Promise<void>;
   refresh: () => Promise<string | null>;
+  updateUserSubscription: (hasActive: boolean, expiresAt?: string | null) => Promise<void>;
+  reloadUser: () => Promise<User | null>;
 }
 
 async function persist(t: TokenPair) {
@@ -34,7 +36,11 @@ export const useAuth = create<AuthState>((set, get) => ({
   refreshToken: null,
 
   hydrate: async () => {
-    const [access, refresh, user] = await Promise.all([secureStorage.get(K.access), secureStorage.get(K.refresh), secureStorage.get(K.user)]);
+    const [access, refresh, user] = await Promise.all([
+      secureStorage.get(K.access),
+      secureStorage.get(K.refresh),
+      secureStorage.get(K.user),
+    ]);
     if (access && refresh && user) {
       set({ accessToken: access, refreshToken: refresh, user: JSON.parse(user), status: 'authenticated' });
     } else set({ status: 'guest' });
@@ -72,6 +78,29 @@ export const useAuth = create<AuthState>((set, get) => ({
       return t.access_token;
     } catch {
       return null;
+    }
+  },
+
+  updateUserSubscription: async (hasActive, expiresAt) => {
+    const cur = get().user;
+    if (!cur) return;
+    const updated: User = {
+      ...cur,
+      has_active_subscription: hasActive,
+      subscription_expires_at: expiresAt !== undefined ? expiresAt : cur.subscription_expires_at,
+    };
+    await secureStorage.set(K.user, JSON.stringify(updated));
+    set({ user: updated });
+  },
+
+  reloadUser: async () => {
+    try {
+      const u = await authApi.me();
+      await secureStorage.set(K.user, JSON.stringify(u));
+      set({ user: u });
+      return u;
+    } catch {
+      return get().user;
     }
   },
 }));

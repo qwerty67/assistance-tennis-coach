@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -56,6 +57,8 @@ class UserOut(ORMModel):
     phone: str
     role: UserRole
     locale: str
+    has_active_subscription: bool = False
+    subscription_expires_at: datetime | None = None
 
 
 class TokenPair(BaseModel):

@@ -6,5 +6,11 @@ export default function Index() {
   const { status, user } = useAuth();
   if (status === 'loading') return <LoadingView />;
   if (status === 'guest' || !user) return <Redirect href="/login" />;
-  return <Redirect href={user.role === 'coach' ? '/coach' : '/student'} />;
+  if (user.role === 'coach') {
+    if (!user.has_active_subscription) {
+      return <Redirect href="/coach/subscription" />;
+    }
+    return <Redirect href="/coach" />;
+  }
+  return <Redirect href="/student" />;
 }
