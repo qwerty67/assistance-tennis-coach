@@ -8,7 +8,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ir.tenniscoach.app"
+      "bundleIdentifier": "ir.tenniscoach.app",
+      "infoPlist": {
+        "ExpoLocalization_supportsRTL": true,
+        "ExpoLocalization_forcesRTL": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -49,7 +53,11 @@
     "extra": {
       "supportsRTL": true,
       "forcesRTL": true,
-      "apiUrl": ""
+      "apiUrl": "https://tennis.arvateam.ir/api/v1",
+      "router": {},
+      "eas": {
+        "projectId": "37da0f3b-2b69-42fa-9aa0-2d5a8b59537a"
+      }
     }
   }
 }
