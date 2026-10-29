@@ -4,7 +4,9 @@ from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, Field
 
 from app.application.schemas.common import ORMModel, Phone
-from app.domain.enums import PlayerLevel, StudentStatus
+from app.domain.enums import (
+    InvitationChannel, InvitationStatus, PlayerLevel, RelationshipStatus, StudentStatus,
+)
 
 
 class StudentBase(BaseModel):
@@ -24,6 +26,8 @@ class StudentBase(BaseModel):
 
 class StudentCreate(StudentBase):
     id: uuid.UUID | None = None  # optional client-generated id (offline-ready)
+    with_invitation: bool = False
+    invitation_channel: InvitationChannel = InvitationChannel.MANUAL
 
 
 class StudentUpdate(BaseModel):
@@ -50,13 +54,61 @@ class AccountOut(ORMModel):
     status: str = "settled"
 
 
+class CoachInvitationOut(ORMModel):
+    id: uuid.UUID
+    coach_id: uuid.UUID
+    student_id: uuid.UUID | None = None
+    phone: str | None = None
+    code: str
+    token: str
+    invite_url: str = ""
+    status: InvitationStatus
+    channel: InvitationChannel
+    expires_at: datetime
+    created_at: datetime
+
+
+class CoachInvitationCreate(BaseModel):
+    student_id: uuid.UUID | None = None
+    phone: Phone | None = None
+    channel: InvitationChannel = InvitationChannel.MANUAL
+    expires_in_days: int = Field(default=30, ge=1, le=365)
+
+
+class CoachInvitationPreview(BaseModel):
+    code: str
+    coach_id: uuid.UUID
+    coach_name: str
+    coach_bio: str | None = None
+    coach_phone: str | None = None
+
+
+class AcceptInvitationIn(BaseModel):
+    code: str
+    set_as_primary: bool = True
+
+
+class StudentCoachOut(BaseModel):
+    coach_id: uuid.UUID
+    coach_name: str
+    coach_bio: str | None = None
+    coach_phone: str | None = None
+    status: RelationshipStatus
+    is_primary: bool
+    role_type: str = "main"
+    connected_at: datetime
+
+
 class StudentOut(StudentBase, ORMModel):
     id: uuid.UUID
     status: StudentStatus
+    relationship_status: RelationshipStatus = RelationshipStatus.ACTIVE
+    is_primary: bool = False
     has_account: bool = False
     created_at: datetime
     updated_at: datetime
     account: AccountOut | None = None
+    invitation: CoachInvitationOut | None = None
 
 
 class TermUsageOut(BaseModel):

@@ -1,7 +1,7 @@
 """Import every model so Alembic / metadata.create_all see them."""
 from app.infrastructure.db.models.identity import Academy, Coach, DeviceToken, RefreshToken, User  # noqa
 from app.infrastructure.db.models.subscription import CoachSubscription  # noqa
-from app.infrastructure.db.models.students import Student  # noqa
+from app.infrastructure.db.models.students import CoachInvitation, CoachStudentRelationship, Student  # noqa
 from app.infrastructure.db.models.classes import (  # noqa
     ClassMember, MakeupSession, Schedule, ScheduleSlot, SessionChangeLog, TennisClass, Term,
     TermMember, TrainingSession,

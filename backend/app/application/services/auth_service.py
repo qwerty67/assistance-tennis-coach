@@ -10,8 +10,8 @@ from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
     create_access_token, create_refresh_token, decode_token, hash_password, verify_password,
 )
-from app.domain.enums import UserRole
-from app.infrastructure.db.models import Coach, RefreshToken, Student, User
+from app.domain.enums import RelationshipStatus, UserRole
+from app.infrastructure.db.models import Coach, CoachStudentRelationship, RefreshToken, Student, User
 from app.infrastructure.db.types import utcnow
 
 
@@ -33,14 +33,35 @@ class AuthService:
         )
 
     def link_student_profiles(self, user: User) -> int:
-        """Attach coach-created student records that match this user's email/phone."""
-        result = self.db.execute(
-            update(Student)
+        """Attach coach-created student records that match this user's email/phone, synchronizing real identity."""
+        students = self.db.scalars(
+            select(Student)
             .where(Student.user_id.is_(None), Student.deleted_at.is_(None))
             .where(or_(Student.email == user.email, Student.phone == user.phone))
-            .values(user_id=user.id)
-        )
-        return result.rowcount or 0
+        ).all()
+        for s in students:
+            s.user_id = user.id
+            s.first_name = user.first_name
+            s.last_name = user.last_name
+            rel = self.db.scalar(
+                select(CoachStudentRelationship).where(
+                    CoachStudentRelationship.coach_id == s.coach_id,
+                    CoachStudentRelationship.student_id == s.id,
+                )
+            )
+            if not rel:
+                self.db.add(
+                    CoachStudentRelationship(
+                        id=uuid.uuid4(),
+                        coach_id=s.coach_id,
+                        student_id=s.id,
+                        status=RelationshipStatus.ACTIVE,
+                        is_primary=True,
+                    )
+                )
+            else:
+                rel.status = RelationshipStatus.ACTIVE
+        return len(students)
 
     # ---- use cases -------------------------------------------------------
     def register(self, data: RegisterIn) -> TokenPair:

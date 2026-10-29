@@ -2,7 +2,7 @@
 from datetime import datetime, time, timedelta, timezone
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.application.context import Actor
 from app.application.services.finance_service import FinanceService
@@ -12,9 +12,9 @@ from app.application.services.student_service import StudentService
 from app.application.services.training_service import TrainingService
 from app.application.services.usage import remaining_sessions
 from app.domain import jalali
-from app.domain.enums import MakeupStatus, SessionStatus, TermStatus
+from app.domain.enums import MakeupStatus, RelationshipStatus, SessionStatus, TermStatus
 from app.infrastructure.db.models import (
-    FinancialAccount, MakeupSession, Student, TennisClass, Term, TermMember, TrainingSession,
+    Coach, CoachStudentRelationship, FinancialAccount, MakeupSession, Student, TennisClass, Term, TermMember, TrainingSession,
 )
 
 
@@ -24,41 +24,40 @@ class DashboardService:
 
     def _day_bounds(self, actor: Actor, offset_days=0):
         d = actor.today() + timedelta(days=offset_days)
-        start = datetime.combine(d, time.min, tzinfo=actor.tz).astimezone(timezone.utc)
-        return start, start + timedelta(days=1)
+        start = datetime.combine(d, time.min, tzinfo=timezone.utc)
+        end = datetime.combine(d, time.max, tzinfo=timezone.utc)
+        return start, end
 
     def coach(self, actor: Actor) -> dict:
+        cid = actor.coach_id
+        start, end = self._day_bounds(actor)
         sessions = SessionService(self.db)
         finance = FinanceService(self.db)
-        cid = actor.coach_id
-        t0, t1 = self._day_bounds(actor)
+        today = sessions.list(actor, start, end)
         now = datetime.now(timezone.utc)
-
-        today = sessions.list(actor, t0, t1)
-        upcoming = [s for s in sessions.list(actor, t1, t1 + timedelta(days=7), include_cancelled=False)][:15]
-        next_up = next((s for s in today if s["end_at"] >= now and s["status"] == "scheduled"), None) \
-            or (upcoming[0] if upcoming else None)
-        cancelled = sessions.list(actor, now - timedelta(days=30), now + timedelta(days=30), status=SessionStatus.CANCELLED)
-
-        # students with low remaining sessions
+        next_up = self.db.scalar(select(TrainingSession).where(
+            TrainingSession.coach_id == cid, TrainingSession.start_at >= now,
+            TrainingSession.status == SessionStatus.SCHEDULED).order_by(TrainingSession.start_at).limit(1))
+        next_up = sessions.detail(actor, next_up.id) if next_up else None
+        upcoming = sessions.list(actor, now, now + timedelta(days=7), include_cancelled=False)
+        cancelled = sessions.list(actor, start - timedelta(days=14), end, status=SessionStatus.CANCELLED)
+        terms = list(self.db.scalars(select(Term).where(
+            Term.coach_id == cid, Term.status == TermStatus.ACTIVE, Term.deleted_at.is_(None))))
         low = []
-        for term in self.db.scalars(select(Term).where(Term.coach_id == cid, Term.deleted_at.is_(None),
-                                                       Term.status == TermStatus.ACTIVE,
-                                                       Term.total_sessions.is_not(None))):
-            for m in term.members:
-                rem = remaining_sessions(self.db, term, m.student_id)
-                st = self.db.get(Student, m.student_id)
-                if st and st.deleted_at is None:
-                    low.append({"student_id": str(st.id), "name": st.full_name, "term_id": str(term.id),
-                                "term_title": term.title, "remaining": rem, "total": term.total_sessions})
-        low.sort(key=lambda x: x["remaining"])
-
-        summary = finance.summary(actor, months=6)
+        for t in terms:
+            for tm in t.members:
+                rem = remaining_sessions(self.db, t, tm.student_id)
+                if rem is not None:
+                    st = self.db.get(Student, tm.student_id)
+                    low.append({"student_id": tm.student_id, "name": st.full_name if st else "",
+                                "term_id": t.id, "term_title": t.title, "remaining": rem, "total": t.total_sessions})
+        summary = finance.summary(actor)
         pending_makeups = self.db.scalar(select(func.count()).select_from(MakeupSession).where(
             MakeupSession.coach_id == cid, MakeupSession.status == MakeupStatus.PENDING)) or 0
-        unmarked = [s for s in sessions.list(actor, now - timedelta(days=7), now, status=SessionStatus.SCHEDULED)
-                    if s["end_at"] < now]
 
+        # Actionable reminders
+        unmarked = [s for s in sessions.list(actor, now - timedelta(days=7), now, status=SessionStatus.SCHEDULED)
+                    if s["end_at"] < now and not s.get("attendance_done")]
         reminders = []
         if unmarked:
             reminders.append({"type": "attendance_missing", "count": len(unmarked),
@@ -117,9 +116,44 @@ class DashboardService:
         classes = list(self.db.scalars(select(TennisClass).join(Term, Term.class_id == TennisClass.id)
                                        .join(TermMember, TermMember.term_id == Term.id)
                                        .where(TermMember.student_id.in_(sids or [None])).distinct()))
+
+        # Look up active coach for student from relationships
+        active_coach_info = None
+        if sids:
+            rel = self.db.scalar(
+                select(CoachStudentRelationship)
+                .options(selectinload(CoachStudentRelationship.coach).selectinload(Coach.user))
+                .where(
+                    CoachStudentRelationship.student_id.in_(sids),
+                    CoachStudentRelationship.status == RelationshipStatus.ACTIVE,
+                )
+                .order_by(CoachStudentRelationship.is_primary.desc(), CoachStudentRelationship.created_at.desc())
+            )
+            if rel and rel.coach and rel.coach.user:
+                active_coach_info = {
+                    "coach_id": str(rel.coach_id),
+                    "coach_name": rel.coach.user.full_name,
+                    "coach_bio": rel.coach.bio,
+                    "coach_phone": rel.coach.user.phone,
+                    "role_type": rel.role_type,
+                    "is_primary": rel.is_primary,
+                }
+            elif profiles and profiles[0] and profiles[0].coach_id:
+                coach_obj = self.db.get(Coach, profiles[0].coach_id)
+                if coach_obj and coach_obj.user:
+                    active_coach_info = {
+                        "coach_id": str(coach_obj.id),
+                        "coach_name": coach_obj.user.full_name,
+                        "coach_bio": coach_obj.bio,
+                        "coach_phone": coach_obj.user.phone,
+                        "role_type": "main",
+                        "is_primary": True,
+                    }
+
         return {
             "profiles": [{"id": str(p.id), "full_name": p.full_name, "level": p.level.value,
                           "coach_id": str(p.coach_id)} for p in profiles],
+            "active_coach": active_coach_info,
             "my_classes": [{"id": str(c.id), "name": c.name, "class_type": c.class_type.value, "color": c.color,
                             "duration_minutes": c.duration_minutes} for c in classes],
             "next_session": upcoming[0] if upcoming else None,

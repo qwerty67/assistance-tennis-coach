@@ -8,9 +8,11 @@ from sqlalchemy import select
 from app.api.deps import DB, CoachActor, CurrentActor, StudentActor
 from app.application.schemas.finance import AccountDetailOut, PaymentOut
 from app.application.schemas.notifications import CoachSettingsIn, DeviceTokenIn, NotificationOut
+from app.application.schemas.students import StudentCoachOut
 from app.application.services.dashboard_service import DashboardService
 from app.application.services.finance_service import FinanceService
 from app.application.services.notification_service import NotificationService
+from app.application.services.student_service import StudentService
 from app.domain.attendance_rules import DEFAULT_CHARGE_RULES
 from app.infrastructure.db.models import Attendance, Payment, Student, TrainingSession
 
@@ -36,6 +38,34 @@ def my_accounts(actor: StudentActor, db: DB):
 @router.get("/me/payments", response_model=list[PaymentOut])
 def my_payments(actor: StudentActor, db: DB):
     return FinanceService(db).list_payments(actor)
+
+
+# ---------------------------------------------------------------- coach relationship management for students
+@router.get("/me/coaches", response_model=list[StudentCoachOut])
+def my_coaches(actor: StudentActor, db: DB):
+    """Business Rules v2.0: List of all coaches connected to this student and active status."""
+    return StudentService(db).get_student_coaches(actor)
+
+
+@router.post("/me/coaches/{coach_id}/primary")
+def set_primary_coach(coach_id: uuid.UUID, actor: StudentActor, db: DB):
+    """Business Rules v2.0: Student sets their active primary coach without disconnecting others."""
+    StudentService(db).set_primary_coach(actor, coach_id)
+    return {"message": "Primary coach updated"}
+
+
+@router.post("/me/coaches/{coach_id}/respond")
+def respond_coach_request(coach_id: uuid.UUID, accept: bool, actor: StudentActor, db: DB):
+    """Business Rules v2.0: Student accepts or rejects an incoming coach connection request."""
+    StudentService(db).respond_relationship(actor, coach_id, accept)
+    return {"message": "Request updated"}
+
+
+@router.post("/me/coaches/{coach_id}/disconnect")
+def disconnect_from_coach(coach_id: uuid.UUID, actor: StudentActor, db: DB):
+    """Business Rules v2.0: Student disconnects from coach; all history remains intact."""
+    StudentService(db).student_disconnect_coach(actor, coach_id)
+    return {"message": "Disconnected"}
 
 
 # ---------------------------------------------------------------- notifications

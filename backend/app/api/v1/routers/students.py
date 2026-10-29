@@ -5,7 +5,9 @@ from fastapi import APIRouter, Query, Response
 from app.api.deps import DB, CoachActor
 from app.application.schemas.finance import AccountDetailOut
 from app.application.schemas.sessions import AttendanceOut
-from app.application.schemas.students import StudentCreate, StudentDetailOut, StudentOut, StudentUpdate
+from app.application.schemas.students import (
+    StudentCreate, StudentDetailOut, StudentOut, StudentUpdate,
+)
 from app.application.services.attendance_service import AttendanceService
 from app.application.services.finance_service import FinanceService
 from app.application.services.student_service import StudentService
@@ -45,6 +47,18 @@ def deactivate(student_id: uuid.UUID, actor: CoachActor, db: DB):
 @router.post("/{student_id}/activate", response_model=StudentOut)
 def activate(student_id: uuid.UUID, actor: CoachActor, db: DB):
     return StudentService(db).set_status(actor, student_id, StudentStatus.ACTIVE)
+
+
+@router.post("/{student_id}/disconnect", response_model=StudentOut)
+def disconnect_student(student_id: uuid.UUID, actor: CoachActor, db: DB):
+    """Deactivates coach-student relationship while strictly preserving all training & financial history."""
+    return StudentService(db).disconnect(actor, student_id)
+
+
+@router.post("/{student_id}/reconnect", response_model=StudentOut)
+def reconnect_student(student_id: uuid.UUID, actor: CoachActor, db: DB):
+    """Reactivates connection with student."""
+    return StudentService(db).reconnect(actor, student_id)
 
 
 @router.delete("/{student_id}", status_code=204)

@@ -8,14 +8,19 @@ import { digits, formatRelativeDay, formatTime } from '@/shared/utils/format';
 import type { Session } from '@/shared/types/api';
 
 /** Big navy card with the next session – the first thing a coach needs on court. */
-export function NextSessionHero({ session, onOpen, actionLabel }: { session: Session | null; onOpen?: () => void; actionLabel?: string }) {
+export function NextSessionHero({ session, onOpen, actionLabel, emptySubtitle }: {
+  session: Session | null;
+  onOpen?: () => void;
+  actionLabel?: string;
+  emptySubtitle?: string;
+}) {
   const { t } = useTranslation();
   if (!session) {
     return (
       <Animated.View entering={FadeInDown.duration(400)} style={styles.card}>
         <Icon name="weather-sunny" size={28} color={colors.accent} />
         <AppText variant="h2" color={colors.textInverse}>{t('dashboard.noUpcoming')}</AppText>
-        <AppText variant="small" color="rgba(255,255,255,0.7)">{t('dashboard.noUpcomingHint')}</AppText>
+        <AppText variant="small" color="rgba(255,255,255,0.7)">{emptySubtitle ?? t('dashboard.noUpcomingHint')}</AppText>
       </Animated.View>
     );
   }

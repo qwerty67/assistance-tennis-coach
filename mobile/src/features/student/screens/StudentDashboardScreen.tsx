@@ -6,7 +6,10 @@ import { NextSessionHero } from '@/features/dashboard/components/NextSessionHero
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { PlanCard } from '@/features/training/components/PlanCard';
 import { useAuth } from '@/features/auth/store';
-import { AppText, Avatar, Card, EmptyState, ErrorView, FinancialBadge, IconButton, PressableScale, ProgressBar, Screen, SectionHeader, SkeletonList, StatCard } from '@/shared/components';
+import {
+  AppText, Avatar, Badge, Card, EmptyState, ErrorView, FinancialBadge, IconButton, PressableScale,
+  ProgressBar, Screen, SectionHeader, SkeletonList, StatCard,
+} from '@/shared/components';
 import { colors, financialStatusColors, spacing } from '@/shared/theme';
 import { digits, formatDate, formatMoney, formatMoneyShort, formatRelativeDay } from '@/shared/utils/format';
 import { useRefresh } from '@/shared/hooks/useRefresh';
@@ -24,6 +27,7 @@ export function StudentDashboardScreen() {
         <AppText variant="small" muted>{formatDate(new Date(), 'dddd D MMMM')}</AppText>
         <AppText variant="h2">{t('dashboard.hello', { name: user?.first_name })}</AppText>
       </View>
+      <IconButton icon="account-tie-outline" onPress={() => router.push('/student/coaches')} />
       <IconButton icon="bell-outline" badge={data?.unread_notifications} onPress={() => router.push('/notifications')} />
     </View>
   );
@@ -31,13 +35,41 @@ export function StudentDashboardScreen() {
   if (isLoading || !data) return <Screen header={header}><SkeletonList /></Screen>;
 
   if (!data.profiles.length) {
-    return <Screen header={header}><EmptyState icon="account-clock-outline" title={t('student.notLinked')} description={t('student.notLinkedHint')} /></Screen>;
+    return (
+      <Screen header={header}>
+        <EmptyState
+          icon="account-clock-outline"
+          title={t('student.notLinked')}
+          description={t('student.notLinkedHint')}
+          actionLabel={t('student.myCoaches')}
+          onAction={() => router.push('/student/coaches')}
+        />
+      </Screen>
+    );
   }
   const f = data.financial;
   const fc = financialStatusColors[f.status];
   return (
     <Screen header={header} refreshing={refreshing} onRefresh={onRefresh}>
-      <NextSessionHero session={data.next_session} onOpen={data.next_session ? () => router.push(`/student/session/${data.next_session!.id}`) : undefined} actionLabel={t('common.details')} />
+      <NextSessionHero
+        session={data.next_session}
+        onOpen={data.next_session ? () => router.push(`/student/session/${data.next_session!.id}`) : undefined}
+        actionLabel={t('common.details')}
+        emptySubtitle={t('dashboard.noUpcomingStudentHint')}
+      />
+      
+      {/* Quick link to My Coaches */}
+      <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.md }} onPress={() => router.push('/student/coaches')}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <Avatar name={data.active_coach?.coach_name ?? t('student.activeCoach')} size={36} />
+          <View>
+            <AppText variant="caption" muted>{t('student.activeCoach')}</AppText>
+            <AppText variant="bodyMedium">{data.active_coach?.coach_name ?? t('student.notLinked')}</AppText>
+          </View>
+        </View>
+        <Badge label={t('student.myCoaches')} color={colors.navy} bg={colors.surfaceMuted} />
+      </Card>
+
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <StatCard icon="counter" label={t('student.remainingSessions')} value={digits(data.remaining_sessions)} onPress={() => router.push('/student/classes')} />
         <StatCard icon="wallet-outline" label={f.debt ? t('finance.debt') : t('finance.balance')} value={formatMoneyShort(f.debt || f.credit)} tint={fc.main} soft={fc.soft} onPress={() => router.push('/student/payments')} />
@@ -70,7 +102,7 @@ export function StudentDashboardScreen() {
       <SectionHeader title={t('dashboard.upcoming')} action={t('common.calendar')} onAction={() => router.push('/student/calendar')} />
       {data.upcoming_sessions.length ? data.upcoming_sessions.slice(0, 4).map((s, i) => (
         <SessionCard key={s.id} session={s} index={i} showDate={formatRelativeDay(s.start_at)} onPress={() => router.push(`/student/session/${s.id}`)} />
-      )) : <Card><EmptyState icon="calendar-blank-outline" title={t('dashboard.noUpcoming')} /></Card>}
+      )) : <Card><EmptyState icon="calendar-blank-outline" title={t('dashboard.noUpcoming')} description={t('dashboard.noUpcomingStudentHint')} /></Card>}
 
       {data.training_plans.length ? (
         <>
@@ -81,17 +113,16 @@ export function StudentDashboardScreen() {
 
       {data.session_history.length ? (
         <>
-          <SectionHeader title={t('student.history')} />
-          {data.session_history.slice(0, 5).map((s, i) => (
-            <SessionCard key={s.id} session={s} index={i} showDate={formatDate(s.start_at, 'D MMMM')} onPress={() => router.push(`/student/session/${s.id}`)} />
+          <SectionHeader title={t('dashboard.history')} />
+          {data.session_history.slice(0, 3).map((s, i) => (
+            <SessionCard key={s.id} session={s} index={i} showDate={formatRelativeDay(s.start_at)} onPress={() => router.push(`/student/session/${s.id}`)} />
           ))}
         </>
       ) : null}
-      <AppText variant="caption" muted align="center" style={{ color: colors.textSubtle }}>{t('student.privacy')}</AppText>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
 });

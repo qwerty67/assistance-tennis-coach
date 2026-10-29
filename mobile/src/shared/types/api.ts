@@ -16,6 +16,42 @@ export type TrainingCategory = 'technical' | 'tactical' | 'mental' | 'fitness';
 export type Intensity = 'low' | 'medium' | 'high' | 'max';
 export type ExerciseStatus = 'todo' | 'in_progress' | 'done';
 export type PlanStatus = 'draft' | 'active' | 'completed' | 'archived';
+export type RelationshipStatus = 'pending' | 'active' | 'rejected' | 'inactive';
+export type InvitationStatus = 'created' | 'sent' | 'used' | 'expired' | 'cancelled';
+export type InvitationChannel = 'manual' | 'sms' | 'bale' | 'eitaa' | 'telegram';
+
+export interface CoachInvitation {
+  id: UUID;
+  coach_id: UUID;
+  student_id?: UUID | null;
+  phone?: string | null;
+  code: string;
+  token: string;
+  status: InvitationStatus;
+  channel: InvitationChannel;
+  expires_at: string;
+  created_at: string;
+  used_at?: string | null;
+}
+
+export interface StudentCoach {
+  coach_id: UUID;
+  coach_name: string;
+  coach_bio?: string | null;
+  coach_phone?: string | null;
+  status: RelationshipStatus;
+  is_primary: boolean;
+  role_type: string;
+  connected_at: string;
+}
+
+export interface CoachInvitationPreview {
+  code: string;
+  coach_id: UUID;
+  coach_name: string;
+  coach_bio?: string | null;
+  coach_phone?: string | null;
+}
 
 export type SubscriptionTier = '1_month' | '3_months' | '6_months';
 export type SubscriptionStatus = 'active' | 'expired' | 'pending' | 'cancelled';
@@ -39,7 +75,7 @@ export interface Student {
   id: UUID; first_name: string; last_name: string; age?: number | null; birth_date?: string | null;
   phone?: string | null; email?: string | null; level: PlayerLevel; start_date?: string | null;
   strengths?: string | null; weaknesses?: string | null; goals?: string | null; coach_notes?: string | null;
-  status: 'active' | 'inactive'; has_account: boolean; account?: Account | null; created_at: string;
+  status: 'active' | 'inactive'; has_account: boolean; account?: Account | null; created_at: string; relationship_status?: RelationshipStatus; is_primary?: boolean; invitation?: CoachInvitation | null;
 }
 export interface TermUsage {
   term_id: UUID; term_title: string; class_id: UUID; class_name: string; class_type: ClassType;
@@ -104,6 +140,7 @@ export interface Charge {
   kind: string; amount: number; court_cost_amount: number; coach_income_amount: number; period?: string | null;
   installment_no?: number | null; due_date?: string | null; description?: string | null; paid: number; remaining: number; status: ChargeStatus;
 }
+export type FinancialAccountDetail = AccountDetail;
 export interface AccountDetail {
   student_id: UUID; student_name: string; total_tuition: number; paid_amount: number; remaining_amount: number; debt: number;
   credit: number; overdue_amount: number; status: FinancialStatus; number_of_sessions: number | null; used_sessions: number;
@@ -142,7 +179,7 @@ export interface CoachDashboard {
   monthly: SeriesPoint[]; reminders: Reminder[]; pending_makeups: number;
 }
 export interface StudentDashboard {
-  profiles: { id: UUID; full_name: string; level: PlayerLevel; coach_id: UUID }[];
+  profiles: { id: UUID; full_name: string; level: PlayerLevel; coach_id: UUID }[]; active_coach?: { coach_id: UUID; coach_name: string; coach_bio?: string | null; coach_phone?: string | null; role_type?: string; is_primary?: boolean } | null;
   my_classes: { id: UUID; name: string; class_type: ClassType; color?: string; duration_minutes: number }[];
   next_session: Session | null; upcoming_sessions: Session[]; terms: TermUsage[]; remaining_sessions: number;
   financial: { balance: number; debt: number; credit: number; status: FinancialStatus; total_charged: number; total_paid: number };

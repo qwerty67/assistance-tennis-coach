@@ -12,8 +12,11 @@ export const PERSIAN_WEEK: ApiWeekday[] = [5, 6, 0, 1, 2, 3, 4];
 /** JS getDay (0=Sunday) -> API weekday */
 export const jsToApiWeekday = (jsDay: number): ApiWeekday => (((jsDay + 6) % 7) as ApiWeekday);
 
-export const ODD_DAYS: ApiWeekday[] = [5, 0, 2]; // شنبه، دوشنبه، چهارشنبه
-export const EVEN_DAYS: ApiWeekday[] = [6, 1, 3]; // یکشنبه، سه‌شنبه، پنجشنبه
+// روزهای زوج در تقویم ورزشی و رسمی ایران: شنبه (5)، دوشنبه (0)، چهارشنبه (2)
+export const EVEN_DAYS: ApiWeekday[] = [5, 0, 2];
+
+// روزهای فرد در تقویم ورزشی و رسمی ایران: یکشنبه (6)، سه‌شنبه (1)، پنج‌شنبه (3)
+export const ODD_DAYS: ApiWeekday[] = [6, 1, 3];
 
 export const toISODate = (d: Dayjs | Date) => dayjs(d).format('YYYY-MM-DD');
 

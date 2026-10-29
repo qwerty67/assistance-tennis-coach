@@ -1,11 +1,13 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { TabBarIcon, tabScreenOptions } from '@/shared/components';
+import { TabBarIcon, useTabScreenOptions } from '@/shared/components';
 
 export default function StudentTabs() {
   const { t } = useTranslation();
+  const screenOptions = useTabScreenOptions();
+
   return (
-    <Tabs screenOptions={tabScreenOptions}>
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen name="index" options={{ title: t('nav.dashboard'), tabBarIcon: ({ focused }) => <TabBarIcon name="home-variant-outline" focused={focused} /> }} />
       <Tabs.Screen name="classes" options={{ title: t('nav.myClasses'), tabBarIcon: ({ focused }) => <TabBarIcon name="tennis" focused={focused} /> }} />
       <Tabs.Screen name="calendar" options={{ title: t('nav.calendar'), tabBarIcon: ({ focused }) => <TabBarIcon name="calendar-month-outline" focused={focused} /> }} />

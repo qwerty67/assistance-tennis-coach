@@ -106,6 +106,7 @@ export function ProfileScreen() {
         </>
       ) : (
         <Card padded={false} style={{ paddingHorizontal: spacing.lg }}>
+          <ListRow icon="account-tie-outline" title={t('student.myCoaches')} onPress={() => router.push('/student/coaches')} divider />
           <ListRow icon="bell-outline" title={t('notifications.title')} onPress={() => router.push('/notifications')} />
         </Card>
       )}
@@ -115,17 +116,26 @@ export function ProfileScreen() {
         <Chips size="sm" label={t('profile.language')} value={i18n.language} onChange={(l) => i18n.changeLanguage(l)} options={[{ value: 'fa', label: 'فارسی' }, { value: 'en', label: 'English' }]} />
         <ListRow icon="lock-reset" title={t('profile.changePassword')} onPress={() => setPwSheet(true)} divider />
         <ListRow icon="server-network" title={t('auth.serverSettings')} onPress={() => setServer(true)} divider />
-        <ListRow icon="logout" title={t('profile.logout')} onPress={async () => { if (await confirm(t('profile.logoutConfirm'))) { await logout(); router.replace('/login'); } }} />
+        <ListRow icon="logout" title={t('profile.logout')} onPress={async () => {
+          if (await confirm(t('profile.logout'), t('profile.logoutConfirm'), true)) logout();
+        }} />
       </Card>
       <AppText variant="caption" muted align="center">{t('profile.version', { v: '1.0.0' })}</AppText>
 
-      <Sheet visible={pwSheet} onClose={() => setPwSheet(false)} title={t('profile.changePassword')}
-        footer={<Button title={t('common.save')} loading={changePw.isPending} onPress={async () => {
-          try { await changePw.mutateAsync({ current_password: cur, new_password: next }); fb.success(t('profile.passwordChanged')); setPwSheet(false); setCur(''); setNext(''); } catch (e) { fb.error(errorMessage(e)); }
-        }} />}>
-        <TextField label={t('profile.currentPassword')} value={cur} onChangeText={setCur} secureTextEntry ltr />
-        <TextField label={t('profile.newPassword')} value={next} onChangeText={setNext} secureTextEntry ltr hint={t('validation.passwordRule')} />
+      <Sheet visible={pwSheet} onClose={() => setPwSheet(false)} title={t('profile.changePassword')}>
+        <View style={{ gap: spacing.md }}>
+          <TextField label={t('profile.currentPassword')} value={cur} onChangeText={setCur} secureTextEntry ltr />
+          <TextField label={t('profile.newPassword')} value={next} onChangeText={setNext} secureTextEntry ltr hint={t('validation.passwordRule')} />
+          <Button title={t('common.save')} loading={changePw.isPending} onPress={async () => {
+            try {
+              await changePw.mutateAsync({ current_password: cur, new_password: next });
+              fb.success(t('profile.passwordChanged'));
+              setPwSheet(false); setCur(''); setNext('');
+            } catch (e) { fb.error(errorMessage(e)); }
+          }} />
+        </View>
       </Sheet>
+
       <ServerSettings visible={server} onClose={() => setServer(false)} />
     </Screen>
   );

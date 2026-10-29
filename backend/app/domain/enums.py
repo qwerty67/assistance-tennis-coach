@@ -13,6 +13,32 @@ class StudentStatus(StrEnum):
     INACTIVE = "inactive"
 
 
+class RelationshipStatus(StrEnum):
+    """Business Rules v2.0: Coach-Student connection status."""
+    PENDING = "pending"  # در انتظار تأیید شاگرد
+    ACTIVE = "active"  # فعال
+    REJECTED = "rejected"  # رد شده
+    INACTIVE = "inactive"  # غیرفعال (قطع ارتباط بدون حذف سوابق)
+
+
+class InvitationStatus(StrEnum):
+    """Invitation lifecycle status."""
+    CREATED = "created"
+    SENT = "sent"
+    USED = "used"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
+class InvitationChannel(StrEnum):
+    """Channel used or intended for invitation delivery."""
+    MANUAL = "manual"
+    SMS = "sms"
+    BALE = "bale"
+    EITAA = "eitaa"
+    TELEGRAM = "telegram"
+
+
 class PlayerLevel(StrEnum):
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
@@ -168,6 +194,9 @@ class NotificationType(StrEnum):
     DEBT_REMINDER = "debt_reminder"
     PAYMENT_RECORDED = "payment_recorded"
     TRAINING_PLAN = "training_plan"
+    COACH_INVITATION = "coach_invitation"
+    COACH_CONNECTED = "coach_connected"
+    COACH_DISCONNECTED = "coach_disconnected"
     GENERAL = "general"
 
 

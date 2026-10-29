@@ -80,14 +80,16 @@ def run():
 
     ts = TermService(db)
     start = today - timedelta(days=12)
-    odd = [SlotIn(weekday=w, start_time=time(17), end_time=time(18)) for w in (5, 0, 2)]
-    even = [SlotIn(weekday=w, start_time=time(18, 30), end_time=time(19, 30)) for w in (6, 1, 3)]
+    # روزهای زوج در ایران: شنبه (5)، دوشنبه (0)، چهارشنبه (2)
+    even = [SlotIn(weekday=w, start_time=time(17), end_time=time(18)) for w in (5, 0, 2)]
+    # روزهای فرد در ایران: یکشنبه (6)، سه‌شنبه (1)، پنج‌شنبه (3)
+    odd = [SlotIn(weekday=w, start_time=time(18, 30), end_time=time(19, 30)) for w in (6, 1, 3)]
     t_private = ts.create(actor, TermCreate(class_id=private["id"], title="ترم ۱۰ جلسه‌ای علی", term_type="fixed_sessions",
                                             total_sessions=10, start_date=start, payment_plan="upfront",
-                                            schedule=ScheduleIn(slots=odd)))
-    t_semi = ts.create(actor, TermCreate(class_id=semi["id"], title="ترم نیمه‌خصوصی پاییز", term_type="fixed_sessions",
+                                            schedule=ScheduleIn(slots=even)))
+    t_semi = ts.create(actor, TermCreate(class_id=semi["id"], title="ترم نیمه‌خصوصی عصر", term_type="fixed_sessions",
                                          total_sessions=12, start_date=start, payment_plan="installments",
-                                         installments_count=2, schedule=ScheduleIn(slots=even)))
+                                         installments_count=2, schedule=ScheduleIn(slots=odd)))
     ts.create(actor, TermCreate(class_id=group["id"], title="شهریه ماهانه کودکان", term_type="monthly",
                                 start_date=today - timedelta(days=10), end_date=today + timedelta(days=20),
                                 schedule=ScheduleIn(slots=[SlotIn(weekday=w, start_time=time(9), end_time=time(10, 30))

@@ -1,8 +1,18 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Share, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useDeleteStudent, useStudent, useStudentAccount, useStudentStatus } from '../api';
+import {
+  useCancelInvitation,
+  useCreateInvitation,
+  useDeleteStudent,
+  useDisconnectStudent,
+  useReconnectStudent,
+  useStudent,
+  useStudentAccount,
+  useStudentInvitation,
+  useStudentStatus,
+} from '../api';
 import {
   AppText, AttendanceBadge, Avatar, Badge, Button, Card, ChargeBadge, ClassTypeBadge, EmptyState, ErrorView, FinancialBadge,
   Header, IconButton, KeyValue, ListRow, LoadingView, ProgressBar, Screen, SectionHeader, SegmentedControl,
@@ -23,9 +33,14 @@ export function StudentDetailScreen() {
   const account = useStudentAccount(id);
   const status = useStudentStatus(id);
   const del = useDeleteStudent();
+  const disconnectStudent = useDisconnectStudent();
+  const reconnectStudent = useReconnectStudent();
+  const inviteQuery = useStudentInvitation(id);
+  const createInvite = useCreateInvitation();
+  const cancelInvite = useCancelInvitation();
   const fb = useFeedback();
   const [tab, setTab] = useState<Tab>('overview');
-  const { refreshing, onRefresh } = useRefresh(refetch, account.refetch);
+  const { refreshing, onRefresh } = useRefresh(refetch, account.refetch, inviteQuery.refetch);
 
   if (isLoading) return <LoadingView />;
   if (error || !s) return <Screen header={<Header back title="" />}><ErrorView error={error} onRetry={refetch} /></Screen>;
@@ -44,6 +59,58 @@ export function StudentDetailScreen() {
     }
   };
 
+  const onDisconnect = async () => {
+    if (!(await confirm(t('students.disconnectStudent'), t('students.disconnectConfirm'), true))) return;
+    try {
+      await disconnectStudent.mutateAsync(id);
+      fb.success(t('common.done'));
+      refetch();
+    } catch (e) {
+      fb.error(errorMessage(e));
+    }
+  };
+
+  const onReconnect = async () => {
+    try {
+      await reconnectStudent.mutateAsync(id);
+      fb.success(t('students.reconnectSuccess'));
+      refetch();
+    } catch (e) {
+      fb.error(errorMessage(e));
+    }
+  };
+
+  const onCreateInvite = async () => {
+    try {
+      await createInvite.mutateAsync({ student_id: id });
+      fb.success(t('students.inviteSent'));
+      inviteQuery.refetch();
+    } catch (e) {
+      fb.error(errorMessage(e));
+    }
+  };
+
+  const onCancelInvite = async (invitationId: string) => {
+    if (!(await confirm(t('students.cancelInvite'), t('common.confirm')))) return;
+    try {
+      await cancelInvite.mutateAsync(invitationId);
+      fb.success(t('common.done'));
+      inviteQuery.refetch();
+    } catch (e) {
+      fb.error(errorMessage(e));
+    }
+  };
+
+  const onShareInvite = async (code: string) => {
+    try {
+      await Share.share({
+        message: `سلام ${s.first_name} عزیز، برای اتصال به سامانه مربی تنیس و مشاهده جلسات و وضعیت تمرینی خود، از کد زیر در بخش «مربیان من» استفاده کنید:\n\nکد اتصال: ${code}`,
+      });
+    } catch {
+      // dismiss
+    }
+  };
+
   return (
     <Screen
       refreshing={refreshing}
@@ -58,7 +125,11 @@ export function StudentDetailScreen() {
             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
               <Badge label={t(`students.level.${s.level}`)} color={colors.navy} bg={colors.surfaceMuted} />
               {s.age ? <Badge label={t('students.ageN', { n: digits(s.age) })} color={colors.textMuted} bg={colors.surfaceMuted} /> : null}
-              {s.has_account ? <Badge label={t('students.hasApp')} color={colors.info} bg={colors.infoSoft} /> : null}
+              {s.has_account ? (
+                <Badge label={t('students.hasApp')} color={colors.info} bg={colors.infoSoft} />
+              ) : (
+                <Badge label={t('students.registerLocalOnly')} color={colors.textMuted} bg={colors.surfaceMuted} />
+              )}
               {s.status === 'inactive' ? <Badge label={t('students.status.inactive')} color={colors.danger} bg={colors.dangerSoft} /> : null}
             </View>
             {s.phone ? <AppText variant="small" muted>{digits(s.phone)}</AppText> : null}
@@ -86,6 +157,64 @@ export function StudentDetailScreen() {
 
       {tab === 'overview' ? (
         <>
+          {/* Invitation & Account Connection Card */}
+          {!s.has_account ? (
+            <>
+              <SectionHeader title={t('students.connectionStatus')} />
+              {inviteQuery.data ? (
+                <Card style={{ gap: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <AppText variant="bodyMedium">{t('students.inviteCode')}</AppText>
+                    <Badge
+                      label={inviteQuery.data.status === 'used' ? t('students.statusActive') : t('students.statusPending')}
+                      color={inviteQuery.data.status === 'used' ? colors.success : colors.primaryDark}
+                      bg={inviteQuery.data.status === 'used' ? colors.successSoft : colors.primarySoft}
+                    />
+                  </View>
+                  <View style={styles.codeBox}>
+                    <AppText variant="h1" align="center" style={{ letterSpacing: 4, fontWeight: '700' }}>
+                      {inviteQuery.data.code}
+                    </AppText>
+                  </View>
+                  <AppText variant="caption" muted align="center">
+                    شاگرد می‌تواند این کد را در بخش «مربیان من» وارد کند یا با همین شماره در اپلیکیشن ثبت‌نام نماید.
+                  </AppText>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                    <Button
+                      size="sm"
+                      title={t('students.shareInvite')}
+                      icon="share-variant-outline"
+                      onPress={() => onShareInvite(inviteQuery.data!.code)}
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      title={t('students.cancelInvite')}
+                      icon="close"
+                      onPress={() => onCancelInvite(inviteQuery.data!.id)}
+                      style={{ flex: 0.7 }}
+                    />
+                  </View>
+                </Card>
+              ) : (
+                <Card style={{ gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.md }}>
+                  <AppText variant="bodyMedium">{t('students.registerLocalOnly')}</AppText>
+                  <AppText variant="caption" muted align="center">
+                    این شاگرد هنوز به اپلیکیشن متصل نشده است. می‌توانید برای او کد دعوت تولید کنید.
+                  </AppText>
+                  <Button
+                    size="sm"
+                    title={t('students.regenerateInvite')}
+                    icon="link-plus"
+                    onPress={onCreateInvite}
+                    loading={createInvite.isPending}
+                  />
+                </Card>
+              )}
+            </>
+          ) : null}
+
           <SectionHeader title={t('students.activeTerms')} />
           {s.terms.length ? s.terms.map((term, i) => (
             <Card key={term.term_id} index={i} onPress={() => router.push(`/coach/term/${term.term_id}`)}>
@@ -119,8 +248,29 @@ export function StudentDetailScreen() {
 
           <SectionHeader title={t('students.manage')} />
           <Card padded={false} style={{ paddingHorizontal: spacing.lg }}>
-            <ListRow icon={s.status === 'active' ? 'account-off-outline' : 'account-check-outline'} title={s.status === 'active' ? t('students.deactivate') : t('students.activate')}
-              onPress={() => status.mutate(s.status !== 'active')} divider />
+            {s.status === 'active' ? (
+              <ListRow
+                icon="account-off-outline"
+                title={t('students.disconnectStudent')}
+                subtitle="سوابق تمرینی و مالی بدون تغییر محفوظ می‌ماند"
+                onPress={onDisconnect}
+                divider
+              />
+            ) : (
+              <ListRow
+                icon="account-check-outline"
+                title={t('students.reconnectStudent')}
+                subtitle="فعالسازی مجدد ارتباط با این شاگرد"
+                onPress={onReconnect}
+                divider
+              />
+            )}
+            <ListRow
+              icon={s.status === 'active' ? 'pause-circle-outline' : 'play-circle-outline'}
+              title={s.status === 'active' ? t('students.deactivate') : t('students.activate')}
+              onPress={() => status.mutate(s.status !== 'active')}
+              divider
+            />
             <ListRow icon="trash-can-outline" title={t('students.delete')} onPress={onDelete} />
           </Card>
         </>
@@ -130,7 +280,7 @@ export function StudentDetailScreen() {
         <>
           <View style={styles.statRow}>
             {(['present', 'excused', 'unexcused', 'makeup'] as const).map((k) => (
-              <View key={k} style={[styles.stat, { backgroundColor: attendanceColors[k].soft }]}>
+              <View key={k} style={[styles.stat, { backgroundColor: attendanceColors[k].soft }]}>\
                 <AppText variant="h2" color={attendanceColors[k].main} align="center">{digits(s.attendance_stats[k] ?? 0)}</AppText>
                 <AppText variant="caption" color={attendanceColors[k].main} align="center">{t(`attendance.status.${k}`)}</AppText>
               </View>
@@ -192,4 +342,14 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   statRow: { flexDirection: 'row', gap: spacing.sm },
   stat: { flex: 1, borderRadius: 14, paddingVertical: spacing.md },
+  codeBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
 });

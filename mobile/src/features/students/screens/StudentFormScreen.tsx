@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useForm } from 'react-hook-form';
@@ -6,7 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import { useSaveStudent, useStudent } from '../api';
 import { studentSchema, StudentForm } from '../schemas';
-import { Button, Card, FormChips, FormDate, FormNumber, FormText, Header, LoadingView, Screen, SectionHeader } from '@/shared/components';
+import {
+  AppText, Button, Card, Chips, FormChips, FormDate, FormNumber, FormText, Header, LoadingView,
+  Screen, SectionHeader,
+} from '@/shared/components';
 import { spacing } from '@/shared/theme';
 import { useFeedback } from '@/shared/hooks/useFeedback';
 import { errorMessage } from '@/shared/utils/errors';
@@ -18,6 +21,8 @@ export function StudentFormScreen() {
   const existing = useStudent(id ?? '');
   const save = useSaveStudent(id);
   const fb = useFeedback();
+  const [withInvite, setWithInvite] = useState(true);
+
   const { control, handleSubmit, reset } = useForm<StudentForm>({
     resolver: zodResolver(studentSchema),
     defaultValues: { first_name: '', last_name: '', level: 'beginner', start_date: toISODate(new Date()), phone: '', email: '' },
@@ -29,7 +34,11 @@ export function StudentFormScreen() {
 
   const onSubmit = handleSubmit(async (v) => {
     try {
-      const out = await save.mutateAsync(studentSchema.parse(v));
+      const parsed = studentSchema.parse(v);
+      const out = await save.mutateAsync({
+        ...parsed,
+        with_invitation: !id ? withInvite : undefined,
+      });
       fb.success(id ? t('common.saved') : t('students.created'));
       if (id) router.back();
       else router.replace(`/coach/student/${out.id}`);
@@ -41,6 +50,20 @@ export function StudentFormScreen() {
   if (id && existing.isLoading) return <LoadingView />;
   return (
     <Screen header={<Header back title={id ? t('students.edit') : t('students.add')} />} footer={<Button title={t('common.save')} onPress={onSubmit} loading={save.isPending} size="lg" />}>
+      {!id ? (
+        <Card style={{ gap: spacing.sm }}>
+          <AppText variant="caption" muted>{t('students.connectionStatus')}</AppText>
+          <Chips
+            value={withInvite ? 'invite' : 'local'}
+            onChange={(v) => setWithInvite(v === 'invite')}
+            options={[
+              { value: 'invite', label: t('students.registerWithInvite'), icon: 'share-variant-outline' },
+              { value: 'local', label: t('students.registerLocalOnly'), icon: 'account-outline' },
+            ]}
+          />
+        </Card>
+      ) : null}
+
       <Card style={{ gap: spacing.lg }}>
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <View style={{ flex: 1 }}><FormText control={control} name="first_name" label={t('auth.firstName')} /></View>
