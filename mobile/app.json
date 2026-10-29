@@ -6,12 +6,22 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1F3A"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ir.tenniscoach.app",
       "infoPlist": {
         "ExpoLocalization_supportsRTL": true,
         "ExpoLocalization_forcesRTL": true
+      },
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0B1F3A"
       }
     },
     "android": {
@@ -20,6 +30,11 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0B1F3A"
       },
       "softwareKeyboardLayoutMode": "pan",
       "predictiveBackGestureEnabled": false,
