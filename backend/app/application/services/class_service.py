@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.application.context import Actor
 from app.application.schemas.classes import ClassCreate, ClassUpdate
+from app.application.services.notification_service import NotificationService
 from app.core.exceptions import ValidationError
-from app.domain.enums import BillingMode, ClassType
+from app.domain.enums import BillingMode, ClassType, NotificationType
 from app.domain.pricing import PriceBreakdown
 from app.infrastructure.db.models import ClassMember, Student, TennisClass
 from app.infrastructure.db.types import utcnow
@@ -55,12 +56,17 @@ class ClassService:
 
     def list(self, actor: Actor, class_type: ClassType | None = None, active: bool | None = None) -> list[dict]:
         stmt = (select(TennisClass).options(selectinload(TennisClass.members))
-                .where(TennisClass.coach_id == actor.coach_id, TennisClass.deleted_at.is_(None)))
+                .where(TennisClass.deleted_at.is_(None)))
+        if actor.coach:
+            stmt = stmt.where(TennisClass.coach_id == actor.coach_id)
+        else:
+            stmt = stmt.join(ClassMember, ClassMember.class_id == TennisClass.id)\
+                .where(ClassMember.student_id.in_(actor.student_ids or [uuid.uuid4()]), ClassMember.is_active.is_(True))
         if class_type:
             stmt = stmt.where(TennisClass.class_type == class_type)
         if active is not None:
             stmt = stmt.where(TennisClass.is_active.is_(active))
-        return [self.to_out(c) for c in self.db.scalars(stmt.order_by(TennisClass.created_at.desc()))]
+        return [self.to_out(c) for c in self.db.scalars(stmt.order_by(TennisClass.created_at.desc())).unique()]
 
     def get(self, actor: Actor, class_id: uuid.UUID) -> dict:
         return self.to_out(self.repo.get_owned(TennisClass, class_id, actor.coach_id))
@@ -111,7 +117,7 @@ class ClassService:
         self.db.commit()
 
     def _add_member(self, actor: Actor, c: TennisClass, student_id: uuid.UUID) -> None:
-        self.repo.get_owned(Student, student_id, actor.coach_id)
+        st = self.repo.get_owned(Student, student_id, actor.coach_id)
         existing = self.db.scalar(select(ClassMember).where(ClassMember.class_id == c.id, ClassMember.student_id == student_id))
         active_count = sum(1 for m in c.members if m.is_active)
         if existing and existing.is_active:
@@ -122,6 +128,19 @@ class ClassService:
             existing.is_active, existing.left_at = True, None
         else:
             c.members.append(ClassMember(student_id=student_id, joined_at=actor.today()))
+
+        # Notify student of enrollment in class
+        try:
+            NotificationService(self.db).notify_students(
+                [st],
+                NotificationType.GENERAL,
+                "عضویت در کلاس جدید",
+                f"شما به کلاس «{c.name}» اضافه شدید.",
+                {"class_id": str(c.id), "class_name": c.name},
+                dedupe_prefix=f"class_member:{c.id}",
+            )
+        except Exception:
+            pass
 
     def add_member(self, actor: Actor, class_id: uuid.UUID, student_id: uuid.UUID) -> dict:
         c = self.repo.get_owned(TennisClass, class_id, actor.coach_id)

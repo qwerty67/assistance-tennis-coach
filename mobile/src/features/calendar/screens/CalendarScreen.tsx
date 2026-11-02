@@ -7,13 +7,13 @@ import { useSessions } from '@/features/sessions/api';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { DayTimeline } from '../components/DayTimeline';
 import { AppText, Card, EmptyState, Fab, Header, IconButton, MonthGrid, PressableScale, Screen, SegmentedControl } from '@/shared/components';
-import { classTypeColors, colors, radius, spacing } from '@/shared/theme';
+import { classTypeColors, colors, getClassColor, radius, spacing } from '@/shared/theme';
 import { d, digits, formatDate } from '@/shared/utils/format';
 import { jalaliMonthGrid, sameDay, startOfPersianWeek, toISODate } from '@/shared/utils/dates';
 
 type View_ = 'day' | 'week' | 'month';
 
-/** Day / week / month calendar (Jalali, week starts Saturday) with colour per class type. */
+/** Day / week / month calendar (Jalali, week starts Saturday) with colour per class type or custom class color. */
 export function CalendarScreen({ role = 'coach' }: { role?: 'coach' | 'student' }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<View_>('week');
@@ -35,7 +35,8 @@ export function CalendarScreen({ role = 'coach' }: { role?: 'coach' | 'student' 
     const m = new Map<string, string[]>();
     data.forEach((s) => {
       const k = toISODate(dayjs(s.start_at));
-      m.set(k, [...(m.get(k) ?? []), classTypeColors[s.class_type].main]);
+      const dotColor = getClassColor(s.class_type, s.color).main;
+      m.set(k, [...(m.get(k) ?? []), dotColor]);
     });
     return m;
   }, [data]);

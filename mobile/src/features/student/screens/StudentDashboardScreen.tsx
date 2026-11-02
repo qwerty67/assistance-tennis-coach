@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useStudentDashboard } from '@/features/dashboard/api';
+import { useUnreadCount } from '@/features/notifications/api';
 import { NextSessionHero } from '@/features/dashboard/components/NextSessionHero';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { PlanCard } from '@/features/training/components/PlanCard';
@@ -18,6 +19,7 @@ export function StudentDashboardScreen() {
   const { t } = useTranslation();
   const user = useAuth((s) => s.user);
   const { data, isLoading, error, refetch } = useStudentDashboard();
+  const unread = useUnreadCount();
   const { refreshing, onRefresh } = useRefresh(refetch);
 
   const header = (
@@ -28,7 +30,7 @@ export function StudentDashboardScreen() {
         <AppText variant="h2">{t('dashboard.hello', { name: user?.first_name })}</AppText>
       </View>
       <IconButton icon="account-tie-outline" onPress={() => router.push('/student/coaches')} />
-      <IconButton icon="bell-outline" badge={data?.unread_notifications} onPress={() => router.push('/notifications')} />
+      <IconButton icon="bell-outline" badge={unread.data?.count ?? data?.unread_notifications} onPress={() => router.push('/notifications')} />
     </View>
   );
   if (error) return <Screen header={header}><ErrorView error={error} onRetry={refetch} /></Screen>;

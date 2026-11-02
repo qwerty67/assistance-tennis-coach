@@ -1,14 +1,14 @@
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppText, Badge, Card, Icon } from '@/shared/components';
-import { classTypeColors, colors, spacing } from '@/shared/theme';
+import { getClassColor, colors, spacing } from '@/shared/theme';
 import { digits, formatTime } from '@/shared/utils/format';
 import type { Session } from '@/shared/types/api';
 
 /** Compact session row: time, class color bar, students, status badges. */
 export function SessionCard({ session, onPress, index = 0, showDate }: { session: Session; onPress?: () => void; index?: number; showDate?: string }) {
   const { t } = useTranslation();
-  const tc = classTypeColors[session.class_type] ?? classTypeColors.private;
+  const tc = getClassColor(session.class_type, session.color);
   const cancelled = session.status === 'cancelled';
   return (
     <Card onPress={onPress} index={index} padded={false} style={cancelled && { opacity: 0.6 }}>

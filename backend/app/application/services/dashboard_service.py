@@ -14,7 +14,7 @@ from app.application.services.usage import remaining_sessions
 from app.domain import jalali
 from app.domain.enums import MakeupStatus, RelationshipStatus, SessionStatus, TermStatus
 from app.infrastructure.db.models import (
-    Coach, CoachStudentRelationship, FinancialAccount, MakeupSession, Student, TennisClass, Term, TermMember, TrainingSession,
+    ClassMember, Coach, CoachStudentRelationship, FinancialAccount, MakeupSession, Student, TennisClass, Term, TermMember, TrainingSession,
 )
 
 
@@ -24,62 +24,74 @@ class DashboardService:
 
     def _day_bounds(self, actor: Actor, offset_days=0):
         d = actor.today() + timedelta(days=offset_days)
-        start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-        end = datetime.combine(d, time.max, tzinfo=timezone.utc)
-        return start, end
+        start = datetime.combine(d, time.min, tzinfo=actor.tz).astimezone(timezone.utc)
+        return start, start + timedelta(days=1)
 
     def coach(self, actor: Actor) -> dict:
-        cid = actor.coach_id
-        start, end = self._day_bounds(actor)
         sessions = SessionService(self.db)
         finance = FinanceService(self.db)
-        today = sessions.list(actor, start, end)
+        cid = actor.coach_id
+        t0, t1 = self._day_bounds(actor)
         now = datetime.now(timezone.utc)
-        next_up = self.db.scalar(select(TrainingSession).where(
-            TrainingSession.coach_id == cid, TrainingSession.start_at >= now,
-            TrainingSession.status == SessionStatus.SCHEDULED).order_by(TrainingSession.start_at).limit(1))
-        next_up = sessions.detail(actor, next_up.id) if next_up else None
-        upcoming = sessions.list(actor, now, now + timedelta(days=7), include_cancelled=False)
-        cancelled = sessions.list(actor, start - timedelta(days=14), end, status=SessionStatus.CANCELLED)
-        terms = list(self.db.scalars(select(Term).where(
-            Term.coach_id == cid, Term.status == TermStatus.ACTIVE, Term.deleted_at.is_(None))))
+
+        today = sessions.list(actor, t0, t1)
+        upcoming = [s for s in sessions.list(actor, t1, t1 + timedelta(days=7), include_cancelled=False)][:15]
+        next_up = next((s for s in today if s["end_at"] >= now and s["status"] == "scheduled"), None) \
+            or (upcoming[0] if upcoming else None)
+        cancelled = sessions.list(actor, now - timedelta(days=30), now + timedelta(days=30), status=SessionStatus.CANCELLED)
+
+        # students with low remaining sessions
         low = []
-        for t in terms:
-            for tm in t.members:
-                rem = remaining_sessions(self.db, t, tm.student_id)
-                if rem is not None:
-                    st = self.db.get(Student, tm.student_id)
-                    low.append({"student_id": tm.student_id, "name": st.full_name if st else "",
-                                "term_id": t.id, "term_title": t.title, "remaining": rem, "total": t.total_sessions})
-        summary = finance.summary(actor)
+        for term in self.db.scalars(select(Term).where(Term.coach_id == cid, Term.deleted_at.is_(None),
+                                                       Term.status == TermStatus.ACTIVE,
+                                                       Term.total_sessions.is_not(None))):
+            for m in term.members:
+                rem = remaining_sessions(self.db, term, m.student_id)
+                st = self.db.get(Student, m.student_id)
+                if st and st.deleted_at is None:
+                    low.append({"student_id": str(st.id), "name": st.full_name, "term_id": str(term.id),
+                                "term_title": term.title, "remaining": rem, "total": term.total_sessions})
+        low.sort(key=lambda x: x["remaining"])
+
+        summary = finance.summary(actor, months=6)
         pending_makeups = self.db.scalar(select(func.count()).select_from(MakeupSession).where(
             MakeupSession.coach_id == cid, MakeupSession.status == MakeupStatus.PENDING)) or 0
-
-        # Actionable reminders
         unmarked = [s for s in sessions.list(actor, now - timedelta(days=7), now, status=SessionStatus.SCHEDULED)
-                    if s["end_at"] < now and not s.get("attendance_done")]
+                    if s["end_at"] < now]
+
         reminders = []
         if unmarked:
             reminders.append({"type": "attendance_missing", "count": len(unmarked),
-                              "session_ids": [str(s["id"]) for s in unmarked[:10]]})
+                              "session_ids": [str(s["id"]) for s in unmarked[:10]],
+                              "title": f"{len(unmarked)} جلسه بدون ثبت حضور"})
         if pending_makeups:
-            reminders.append({"type": "makeup_pending", "count": pending_makeups})
+            reminders.append({"type": "makeup_pending", "count": pending_makeups,
+                              "title": f"{pending_makeups} جلسه جبرانی در انتظار"})
         overdue = [d for d in summary["debtors"] if d["overdue"] > 0]
         if overdue:
             reminders.append({"type": "overdue_payments", "count": len(overdue),
-                              "amount": sum(d["overdue"] for d in overdue)})
+                              "amount": sum(d["overdue"] for d in overdue),
+                              "title": f"{len(overdue)} شاگرد با پرداخت معوق"})
         ending = [x for x in low if x["remaining"] <= 2]
         if ending:
-            reminders.append({"type": "terms_ending", "count": len(ending)})
+            reminders.append({"type": "terms_ending", "count": len(ending),
+                              "title": f"{len(ending)} ترم در حال پایان"})
 
         jy, jm, jd = jalali.to_jalali(actor.today())
+        students_count = StudentService(self.db).count(actor)
+        classes_count = self.db.scalar(select(func.count()).select_from(TennisClass).where(
+            TennisClass.coach_id == cid, TennisClass.deleted_at.is_(None), TennisClass.is_active.is_(True))) or 0
+
+        tomorrow_start, tomorrow_end = self._day_bounds(actor, 1)
+        tomorrow_sessions = sessions.list(actor, tomorrow_start, tomorrow_end)
+
         return {
             "today": actor.today(), "jalali_today": [jy, jm, jd],
-            "students": StudentService(self.db).count(actor),
-            "classes_count": self.db.scalar(select(func.count()).select_from(TennisClass).where(
-                TennisClass.coach_id == cid, TennisClass.deleted_at.is_(None), TennisClass.is_active.is_(True))) or 0,
+            "students": students_count,
+            "classes_count": classes_count,
             "today_classes": len({s["class_id"] for s in today}),
             "today_sessions": today,
+            "tomorrow_sessions": tomorrow_sessions,
             "next_session": next_up,
             "upcoming_sessions": upcoming,
             "cancelled_sessions": cancelled[:10],
@@ -93,6 +105,11 @@ class DashboardService:
             "monthly": summary["monthly"],
             "reminders": reminders,
             "pending_makeups": pending_makeups,
+            "active_students": students_count.get("active", 0) if isinstance(students_count, dict) else 0,
+            "active_terms": self.db.scalar(select(func.count(Term.id)).where(Term.coach_id == cid, Term.status == TermStatus.ACTIVE, Term.deleted_at.is_(None))) or 0,
+            "total_debt": summary["outstanding"],
+            "unmarked_sessions_count": len(unmarked),
+            "unmarked_sessions": unmarked[:5],
         }
 
     def student(self, actor: Actor) -> dict:
@@ -103,19 +120,35 @@ class DashboardService:
         upcoming = sessions.list(actor, now, now + timedelta(days=30), include_cancelled=False)
         history = sessions.list(actor, now - timedelta(days=90), now)
         profiles = [self.db.get(Student, i) for i in sids]
-        accounts = list(self.db.scalars(select(FinancialAccount).where(FinancialAccount.student_id.in_(sids or [None]))))
+        
+        today = actor.today()
+        accounts = []
+        for p in profiles:
+            if p:
+                acc = finance.recalc(p, today)
+                accounts.append(acc)
+
         terms = []
         sv = StudentService(self.db)
         for p in profiles:
-            terms.extend(sv.term_usages(p))
+            if p:
+                terms.extend(sv.term_usages(p))
         balance = sum(a.balance for a in accounts)
         status = "settled"
         if accounts:
             order = ["overdue", "debt", "partial", "credit", "settled"]
             status = min((a.status for a in accounts), key=lambda s: order.index(s) if s in order else 9)
-        classes = list(self.db.scalars(select(TennisClass).join(Term, Term.class_id == TennisClass.id)
-                                       .join(TermMember, TermMember.term_id == Term.id)
-                                       .where(TermMember.student_id.in_(sids or [None])).distinct()))
+
+        term_classes = list(self.db.scalars(
+            select(TennisClass).join(Term, Term.class_id == TennisClass.id)
+            .join(TermMember, TermMember.term_id == Term.id)
+            .where(TermMember.student_id.in_(sids or [None]), TennisClass.deleted_at.is_(None)).distinct()
+        ))
+        direct_classes = list(self.db.scalars(
+            select(TennisClass).join(ClassMember, ClassMember.class_id == TennisClass.id)
+            .where(ClassMember.student_id.in_(sids or [None]), ClassMember.is_active.is_(True), TennisClass.deleted_at.is_(None)).distinct()
+        ))
+        classes = list({c.id: c for c in (term_classes + direct_classes)}.values())
 
         # Look up active coach for student from relationships
         active_coach_info = None
@@ -150,9 +183,16 @@ class DashboardService:
                         "is_primary": True,
                     }
 
+        # Auto-trigger reminders check (idempotent via dedupe keys)
+        from app.jobs.reminders import run_reminders
+        try:
+            run_reminders(self.db)
+        except Exception:
+            pass
+
         return {
             "profiles": [{"id": str(p.id), "full_name": p.full_name, "level": p.level.value,
-                          "coach_id": str(p.coach_id)} for p in profiles],
+                          "coach_id": str(p.coach_id)} for p in profiles if p],
             "active_coach": active_coach_info,
             "my_classes": [{"id": str(c.id), "name": c.name, "class_type": c.class_type.value, "color": c.color,
                             "duration_minutes": c.duration_minutes} for c in classes],

@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import dayjs from 'dayjs';
 import { AppText, PressableScale } from '@/shared/components';
-import { classTypeColors, colors, radius, spacing } from '@/shared/theme';
+import { getClassColor, colors, radius, spacing } from '@/shared/theme';
 import { digits, formatTime } from '@/shared/utils/format';
 import type { Session } from '@/shared/types/api';
 
@@ -25,7 +25,7 @@ export function DayTimeline({ sessions, onPress }: { sessions: Session[]; onPres
         const st = dayjs(s.start_at);
         const top = (st.hour() + st.minute() / 60 - FROM) * HOUR;
         const height = Math.max(28, (dayjs(s.end_at).diff(st, 'minute') / 60) * HOUR - 4);
-        const c = classTypeColors[s.class_type];
+        const c = getClassColor(s.class_type, s.color);
         return (
           <PressableScale key={s.id} onPress={() => onPress(s)} style={[styles.block, { top, height, backgroundColor: c.soft, borderColor: c.main, opacity: s.status === 'cancelled' ? 0.5 : 1 }]}>
             <AppText variant="small" color={c.main} numberOfLines={1} style={{ fontFamily: 'Vazirmatn_700Bold' }}>{s.class_name}</AppText>

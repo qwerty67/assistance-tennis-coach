@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,8 +8,8 @@ import { useClass, useSaveClass } from '../api';
 import { classSchema, ClassForm } from '../schemas';
 import { PriceBreakdown } from '../components/PriceBreakdown';
 import { StudentPicker } from '../components/StudentPicker';
-import { AppText, Button, Card, FormChips, FormMoney, FormNumber, FormText, Header, ListRow, LoadingView, Screen, SectionHeader } from '@/shared/components';
-import { classTypeColors, spacing } from '@/shared/theme';
+import { AppText, Button, Card, FormChips, FormMoney, FormNumber, FormText, Header, Icon, ListRow, LoadingView, Screen, SectionHeader } from '@/shared/components';
+import { classPalette, classTypeColors, colors, spacing } from '@/shared/theme';
 import { useFeedback } from '@/shared/hooks/useFeedback';
 import { errorMessage } from '@/shared/utils/errors';
 import { digits } from '@/shared/utils/format';
@@ -32,16 +32,17 @@ export function ClassFormScreen() {
   const [picker, setPicker] = useState(false);
   const { control, handleSubmit, reset, setValue } = useForm<ClassForm>({
     resolver: zodResolver(classSchema),
-    defaultValues: { name: '', class_type: 'private', ...PRESETS.private, session_price: 1_000_000, court_cost: 300_000, monthly_fee: 0 } as ClassForm,
+    defaultValues: { name: '', class_type: 'private', ...PRESETS.private, session_price: 1_000_000, court_cost: 300_000, monthly_fee: 0, color: null } as ClassForm,
   });
   const type = useWatch({ control, name: 'class_type' });
+  const color = useWatch({ control, name: 'color' });
   const price = useWatch({ control, name: 'session_price' }) ?? 0;
   const court = useWatch({ control, name: 'court_cost' }) ?? 0;
   const billing = useWatch({ control, name: 'billing_mode' });
 
   useEffect(() => {
     const c = existing.data;
-    if (c) reset({ ...c, location: c.location ?? '', description: c.description ?? '' });
+    if (c) reset({ ...c, color: c.color ?? null, location: c.location ?? '', description: c.description ?? '' });
   }, [existing.data, reset]);
 
   const pickType = (v: ClassType) => {
@@ -85,9 +86,38 @@ export function ClassFormScreen() {
         <FormChips control={control} name="duration_minutes" options={[60, 90, 120, 180].map((m) => ({ value: m, label: `${digits(m)}′` }))} />
       </Card>
 
+      <SectionHeader title={t('classes.color')} />
+      <Card style={{ gap: spacing.md }}>
+        <AppText variant="small" muted>{t('classes.colorHint')}</AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+          {classPalette.map((clr) => {
+            const isSelected = (color === clr) || (!color && classTypeColors[type]?.main === clr);
+            return (
+              <Pressable
+                key={clr}
+                onPress={() => setValue('color', clr)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: clr,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: isSelected ? 3 : 1,
+                  borderColor: isSelected ? colors.navy : 'transparent',
+                }}
+              >
+                {isSelected ? <Icon name="check" size={20} color="#FFFFFF" /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </Card>
+
       <SectionHeader title={t('classes.pricing')} />
       <Card style={{ gap: spacing.lg }}>
         <AppText variant="small" muted>{t('classes.pricingHint')}</AppText>
+        <AppText variant="caption" color={colors.info}>{t('classes.pricingNote')}</AppText>
         <FormMoney control={control} name="session_price" label={type === 'semi_private' ? t('classes.totalSessionPrice') : t('classes.sessionPrice')} />
         <FormMoney control={control} name="court_cost" label={t('classes.courtCost')} />
         <PriceBreakdown price={price} court={court} />

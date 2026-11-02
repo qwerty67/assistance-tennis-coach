@@ -133,26 +133,38 @@ export interface Makeup {
 
 export interface Payment {
   id: UUID; student_id: UUID; student_name?: string; amount: number; paid_at: string; method: PaymentMethod;
-  description?: string | null; term_id?: UUID | null; class_id?: UUID | null; reference_no?: string | null; created_at: string;
+  description?: string | null; term_id?: UUID | null; class_id?: UUID | null; class_name?: string | null; reference_no?: string | null; created_at: string;
 }
 export interface Charge {
-  id: UUID; student_id: UUID; student_name?: string; term_id?: UUID | null; class_id?: UUID | null; session_id?: UUID | null;
+  id: UUID; student_id: UUID; student_name?: string; term_id?: UUID | null; class_id?: UUID | null; class_name?: string | null; session_id?: UUID | null;
   kind: string; amount: number; court_cost_amount: number; coach_income_amount: number; period?: string | null;
   installment_no?: number | null; due_date?: string | null; description?: string | null; paid: number; remaining: number; status: ChargeStatus;
 }
+
+export interface ClassDebt {
+  class_id: UUID | null;
+  class_name: string;
+  class_type?: ClassType | null;
+  color?: string | null;
+  charged: number;
+  paid: number;
+  debt: number;
+}
+
 export type FinancialAccountDetail = AccountDetail;
 export interface AccountDetail {
-  student_id: UUID; student_name: string; total_tuition: number; paid_amount: number; remaining_amount: number; debt: number;
+  student_id: UUID; student_name: string; coach_id?: UUID | null; coach_name?: string | null;
+  total_tuition: number; paid_amount: number; remaining_amount: number; debt: number;
   credit: number; overdue_amount: number; status: FinancialStatus; number_of_sessions: number | null; used_sessions: number;
-  remaining_sessions: number | null; charges: Charge[]; payments: Payment[];
+  remaining_sessions: number | null; debts_by_class: ClassDebt[]; charges: Charge[]; payments: Payment[];
 }
 export interface SeriesPoint { key: string; label_year: number; label_month: number; received: number; charged: number; coach_income: number; court_cost: number }
-export interface Debtor { student_id: UUID; name: string; debt: number; overdue: number; status: FinancialStatus }
+export interface Debtor { student_id: UUID; name: string; debt: number; overdue: number; status: FinancialStatus; debts_by_class?: ClassDebt[] }
 export interface FinancialSummary {
   period_start: string; period_end: string; received: number; charged: number; coach_income: number; court_cost: number;
   outstanding: number; total_credit: number; debtors_count: number; month_income: number; year_income: number;
   monthly: SeriesPoint[]; by_class_type: { class_type: string; charged: number; received: number }[];
-  by_class: { class_id: UUID; name: string; class_type: ClassType; charged: number; received: number }[];
+  by_class: { class_id: UUID; name: string; class_type: ClassType; color?: string | null; charged: number; received: number }[];
   by_student: { student_id: UUID; name: string; received: number }[]; by_method: { method: PaymentMethod; amount: number }[];
   debtors: Debtor[];
 }

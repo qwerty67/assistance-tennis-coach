@@ -4,10 +4,10 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useFinanceSummary, usePayments, useVoidPayment } from '../api';
 import {
-  AppText, Avatar, BarChart, Card, Chips, DonutChart, EmptyState, ErrorView, Fab, FinancialBadge, HBarList, Header, KeyValue, ListRow, Screen,
+  AppText, Avatar, Badge, BarChart, Card, Chips, DonutChart, EmptyState, ErrorView, Fab, FinancialBadge, HBarList, Header, KeyValue, ListRow, Screen,
   SectionHeader, SegmentedControl, SkeletonList, StatCard,
 } from '@/shared/components';
-import { classTypeColors, colors, spacing } from '@/shared/theme';
+import { classTypeColors, colors, getClassColor, spacing } from '@/shared/theme';
 import { digits, formatDate, formatMoney, formatMoneyShort, jalaliMonthName } from '@/shared/utils/format';
 import { confirm } from '@/shared/utils/confirm';
 import { useRefresh } from '@/shared/hooks/useRefresh';
@@ -91,9 +91,21 @@ export function FinanceScreen() {
           {tab === 'debts' ? (
             <Card padded={false} style={{ paddingHorizontal: spacing.lg }}>
               {data.debtors.length ? data.debtors.map((x, i) => (
-                <ListRow key={x.student_id} left={<Avatar name={x.name} size={38} />} title={x.name}
-                  subtitle={`${t('finance.debt')}: ${formatMoney(x.debt)}${x.overdue ? ' · ' + t('finance.overdue') + ': ' + formatMoney(x.overdue) : ''}`}
-                  right={<FinancialBadge status={x.status} />} onPress={() => router.push(`/coach/payment/new?studentId=${x.student_id}`)} divider={i < data.debtors.length - 1} />
+                <View key={x.student_id} style={{ borderBottomWidth: i < data.debtors.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                  <ListRow left={<Avatar name={x.name} size={38} />} title={x.name}
+                    subtitle={`${t('finance.debt')}: ${formatMoney(x.debt)}${x.overdue ? ' · ' + t('finance.overdue') + ': ' + formatMoney(x.overdue) : ''}`}
+                    right={<FinancialBadge status={x.status} />} onPress={() => router.push(`/coach/payment/new?studentId=${x.student_id}`)} divider={false} />
+                  {x.debts_by_class?.length ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: spacing.md, paddingBottom: spacing.sm, marginTop: -4 }}>
+                      {x.debts_by_class.map((cd, idx) => {
+                        const clr = getClassColor(cd.class_type ?? undefined, cd.color);
+                        return (
+                          <Badge key={idx} dot label={`${cd.class_name}: ${formatMoney(cd.debt)}`} color={clr.main} bg={clr.soft} />
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
               )) : <EmptyState icon="check-decagram-outline" title={t('dashboard.noDebtors')} />}
             </Card>
           ) : null}

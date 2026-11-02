@@ -1,11 +1,11 @@
 import uuid
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
-from app.domain.enums import NotificationType
-from app.infrastructure.db.models import DeviceToken, Notification, Student
+from app.domain.enums import NotificationType, UserRole
+from app.infrastructure.db.models import DeviceToken, Notification, Student, User
 from app.infrastructure.db.types import utcnow
 from app.infrastructure.notifications.push import get_push_gateway
 
@@ -31,6 +31,15 @@ class NotificationService:
                         data: dict | None = None, dedupe_prefix: str | None = None) -> int:
         count = 0
         for s in students:
+            if not s.user_id and (s.phone or s.email):
+                conds = []
+                if s.phone:
+                    conds.append(User.phone == s.phone)
+                if s.email:
+                    conds.append(User.email == s.email)
+                u = self.db.scalar(select(User).where(User.role == UserRole.STUDENT, or_(*conds)))
+                if u:
+                    s.user_id = u.id
             if s.user_id:
                 key = f"{dedupe_prefix}:{s.id}" if dedupe_prefix else None
                 if self.notify_user(s.user_id, ntype, title, body, data, key):

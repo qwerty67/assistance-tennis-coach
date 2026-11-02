@@ -12,7 +12,13 @@ export const notificationsApi = {
 };
 
 export const useNotifications = () => useQuery({ queryKey: qk.notifications, queryFn: notificationsApi.list });
-export const useUnreadCount = () => useQuery({ queryKey: qk.unread, queryFn: notificationsApi.unread, refetchInterval: 60_000 });
-const refresh = () => queryClient.invalidateQueries({ queryKey: ['notifications'] });
+export const useUnreadCount = () => useQuery({ queryKey: qk.unread, queryFn: notificationsApi.unread, refetchInterval: 30_000 });
+
+const refresh = () => {
+  queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  queryClient.invalidateQueries({ queryKey: qk.unread });
+  queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+};
+
 export const useReadNotification = () => useMutation({ mutationFn: notificationsApi.read, onSuccess: refresh });
 export const useReadAll = () => useMutation({ mutationFn: notificationsApi.readAll, onSuccess: refresh });

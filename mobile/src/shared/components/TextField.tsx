@@ -1,4 +1,4 @@
-import { forwardRef, ReactNode, useState } from 'react';
+import { forwardRef, ReactNode, useState, ElementRef } from 'react';
 import { StyleSheet, TextInput, TextInputProps, View } from 'react-native';
 import { AppText } from './AppText';
 import { Icon, IconName } from './Icon';
@@ -14,7 +14,7 @@ export interface TextFieldProps extends TextInputProps {
   ltr?: boolean; // email, phone, url fields
 }
 
-export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+export const TextField = forwardRef<ElementRef<typeof TextInput>, TextFieldProps>(function TextField(
   { label, error, hint, icon, suffix, ltr, style, multiline, onFocus, onBlur, ...rest },
   ref,
 ) {

@@ -63,6 +63,30 @@ export const classTypeColors: Record<string, { main: string; soft: string }> = {
   academy: { main: palette.violet500, soft: palette.violet100 },
 };
 
+/** Distinct color palette for tennis classes (coaches can pick or system assigns). */
+export const classPalette = [
+  '#0FA968', // Court Green
+  '#2F6BFF', // Electric Blue
+  '#7C5CFF', // Deep Violet
+  '#EA580C', // Clay Orange
+  '#D946EF', // Vibrant Fuchsia
+  '#0891B2', // Cyan/Teal
+  '#E5484D', // Sport Red
+  '#D97706', // Warm Amber
+  '#059669', // Emerald
+  '#4F46E5', // Indigo
+] as const;
+
+export function getClassColor(classType?: string, customColor?: string | null): { main: string; soft: string } {
+  if (customColor) {
+    return { main: customColor, soft: `${customColor}25` };
+  }
+  if (classType && classTypeColors[classType]) {
+    return classTypeColors[classType];
+  }
+  return classTypeColors.private;
+}
+
 export const financialStatusColors: Record<string, { main: string; soft: string }> = {
   settled: { main: palette.green500, soft: palette.green100 },
   credit: { main: palette.blue500, soft: palette.blue100 },

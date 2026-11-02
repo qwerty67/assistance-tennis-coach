@@ -1,16 +1,16 @@
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppText, Card, ClassTypeBadge, Icon } from '@/shared/components';
-import { classTypeColors, colors, spacing } from '@/shared/theme';
+import { getClassColor, colors, spacing } from '@/shared/theme';
 import { digits, formatMoney } from '@/shared/utils/format';
 import type { TennisClass } from '@/shared/types/api';
 
 export function ClassCard({ item, onPress, index }: { item: TennisClass; onPress?: () => void; index?: number }) {
   const { t } = useTranslation();
-  const c = classTypeColors[item.class_type];
+  const c = getClassColor(item.class_type, item.color);
   const price = item.class_type === 'group' && item.monthly_fee ? `${formatMoney(item.monthly_fee)} / ${t('common.month')}` : `${formatMoney(item.session_price)} / ${t('common.session')}`;
   return (
-    <Card onPress={onPress} index={index} style={!item.is_active && { opacity: 0.55 }}>
+    <Card onPress={onPress} index={index} style={[{ borderStartWidth: 4, borderStartColor: c.main }, !item.is_active && { opacity: 0.55 }]}>
       <View style={styles.row}>
         <View style={[styles.icon, { backgroundColor: c.soft }]}>
           <Icon name={item.class_type === 'academy' ? 'school-outline' : item.class_type === 'group' ? 'account-group' : item.class_type === 'semi_private' ? 'account-multiple' : 'account'} size={22} color={c.main} />

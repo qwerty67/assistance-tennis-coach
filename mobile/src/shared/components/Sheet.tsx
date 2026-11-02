@@ -9,14 +9,17 @@ import { getDirection } from '@/shared/hooks/useDirection';
 
 interface Props { visible: boolean; onClose: () => void; title?: string; children: ReactNode; footer?: ReactNode }
 
-/** Bottom sheet modal used for quick actions (attendance, pickers, cancel reason...). */
+/** Bottom sheet modal used for quick actions (attendance, pickers, cancel reason...).
+ * Touch-safe on Android 14/15: backdrop scrim is non-overlapping and sheet has explicit elevation/zIndex.
+ */
 export function Sheet({ visible, onClose, title, children, footer }: Props) {
   const insets = useSafeAreaInsets();
   const dir = getDirection();
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(150)} style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        {/* Scrim pressable sits strictly above the sheet in the flex column - never overlaps the sheet body */}
+        <Pressable style={styles.scrimPressable} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.springify().damping(22).stiffness(220)}
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }, dir.manual && { direction: 'rtl' }]}
@@ -40,7 +43,16 @@ export function Sheet({ visible, onClose, title, children, footer }: Props) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.background, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  scrimPressable: { flex: 1, width: '100%' },
+  sheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    zIndex: 20,
+    elevation: 20,
+  },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
 });

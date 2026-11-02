@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.application.schemas.common import ORMModel
 from app.domain.enums import ChargeKind, PaymentMethod
@@ -18,6 +18,20 @@ class PaymentCreate(BaseModel):
     class_id: uuid.UUID | None = None
     reference_no: str | None = Field(default=None, max_length=64)
 
+    @field_validator("id", "term_id", "class_id", mode="before")
+    @classmethod
+    def empty_uuid_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("description", "reference_no", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class PaymentOut(ORMModel):
     id: uuid.UUID
@@ -29,6 +43,7 @@ class PaymentOut(ORMModel):
     description: str | None
     term_id: uuid.UUID | None
     class_id: uuid.UUID | None
+    class_name: str | None = None
     reference_no: str | None
     is_void: bool
     created_at: datetime
@@ -44,6 +59,13 @@ class ChargeCreate(BaseModel):
     class_id: uuid.UUID | None = None
     court_cost_amount: int = Field(default=0, ge=0)
 
+    @field_validator("term_id", "class_id", mode="before")
+    @classmethod
+    def empty_uuid_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class ChargeOut(ORMModel):
     id: uuid.UUID
@@ -51,6 +73,7 @@ class ChargeOut(ORMModel):
     student_name: str | None = None
     term_id: uuid.UUID | None
     class_id: uuid.UUID | None
+    class_name: str | None = None
     session_id: uuid.UUID | None
     kind: ChargeKind
     amount: int
@@ -66,9 +89,21 @@ class ChargeOut(ORMModel):
     status: str = "unpaid"
 
 
+class ClassDebtOut(BaseModel):
+    class_id: uuid.UUID | None = None
+    class_name: str
+    class_type: str | None = None
+    color: str | None = None
+    charged: int = 0
+    paid: int = 0
+    debt: int = 0
+
+
 class AccountDetailOut(BaseModel):
     student_id: uuid.UUID
     student_name: str
+    coach_id: uuid.UUID | None = None
+    coach_name: str | None = None
     total_tuition: int
     paid_amount: int
     remaining_amount: int
@@ -79,6 +114,7 @@ class AccountDetailOut(BaseModel):
     number_of_sessions: int | None
     used_sessions: int
     remaining_sessions: int | None
+    debts_by_class: list[ClassDebtOut] = []
     charges: list[ChargeOut] = []
     payments: list[PaymentOut] = []
 

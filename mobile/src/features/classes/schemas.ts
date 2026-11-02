@@ -11,6 +11,7 @@ export const classSchema = z
     court_cost: z.number().min(0).nullable().transform((v) => v ?? 0),
     monthly_fee: z.number().min(0).nullable().transform((v) => v ?? 0),
     billing_mode: z.enum(['per_student', 'split', 'lump']),
+    color: z.string().nullable().optional(),
     location: z.string().optional(),
     description: z.string().optional(),
   })

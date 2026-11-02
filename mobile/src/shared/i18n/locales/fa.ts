@@ -5,7 +5,7 @@ const fa = {
     today: 'امروز', tomorrow: 'فردا', yesterday: 'دیروز', cancel: 'انصراف', confirm: 'تأیید', retry: 'تلاش دوباره',
     selectDate: 'انتخاب تاریخ', time: 'ساعت', hour: 'ساعت', minute: 'دقیقه', minutes: 'دقیقه', month: 'ماه', session: 'جلسه',
     save: 'ذخیره', saved: 'ذخیره شد', deleted: 'حذف شد', add: 'افزودن', edit: 'ویرایش', all: 'همه', done: 'تمام', continue: 'ادامه',
-    optional: 'اختیاری', description: 'توضیحات', date: 'تاریخ', details: 'جزئیات', seeAll: 'همه', calendar: 'تقویم', refresh: 'بارگذاری مجدد',
+    optional: 'اختیاری', description: 'توضیحات', date: 'تاریخ', details: 'جزئیات', seeAll: 'همه', calendar: 'تقویم', refresh: 'بارگذاری مجدد', close: 'بستن',
   },
   nav: {
     dashboard: 'داشبورد', students: 'شاگردان', calendar: 'تقویم', classes: 'کلاس‌ها', finance: 'مالی',
@@ -141,6 +141,8 @@ const fa = {
     },
     extra: 'اطلاعات تکمیلی', location: 'محل برگزاری', members: 'اعضا', addMember: 'افزودن شاگرد', selectedN: '{{n}} شاگرد انتخاب شد',
     noMembers: 'هنوز عضوی ندارد', delete: 'حذف کلاس', deleteConfirm: 'کلاس و همه جلسات آن حذف شود؟',
+    color: 'رنگ کلاس', colorHint: 'انتخاب رنگ متمایز این کلاس برای نمایش در تقویم و کارت‌ها',
+    pricingNote: 'قیمت جلسه مبنای محاسبه جلسات آزاد (خارج از ترم) خواهد بود. برای کلاس‌های دارای ترم، شهریه در زمان ساخت ترم مشخص می‌شود.',
   },
   terms: {
     title: 'ترم‌ها', new: 'ترم جدید', create: 'ساخت ترم و جلسات', empty: 'ترمی ثبت نشده',
@@ -177,6 +179,7 @@ const fa = {
     restore: 'بازگردانی جلسه', delete: 'حذف جلسه', deleteConfirm: 'این جلسه حذف شود؟', history: 'تاریخچه تغییرات',
     change: { created: 'ایجاد', rescheduled: 'تغییر زمان', updated: 'ویرایش', cancelled: 'لغو', restored: 'بازگردانی', deleted: 'حذف' },
     linkTerm: 'مرتبط با ترم', noTerm: 'جلسه آزاد', time: 'زمان', start: 'شروع', end: 'پایان', notes: 'یادداشت',
+    freeSessionPriceNotice: 'این جلسه به صورت آزاد ثبت می‌شود و شهریه آن طبق قیمت جلسه کلاس محاسبه خواهد شد:',
   },
   attendance: {
     title: 'حضور و غیاب', take: 'ثبت حضور و غیاب', save: 'ثبت حضور و غیاب', update: 'به‌روزرسانی حضور و غیاب',
@@ -199,7 +202,7 @@ const fa = {
     charges: 'بدهی‌ها و شهریه‌ها', payments: 'پرداخت‌ها', noCharges: 'شهریه‌ای ثبت نشده', noPayments: 'پرداختی ثبت نشده', due: 'سررسید {{d}}',
     recordPayment: 'ثبت پرداخت', savePayment: 'ثبت پرداخت', pickStudent: 'انتخاب شاگرد', paymentInfo: 'اطلاعات پرداخت', amount: 'مبلغ',
     payAll: 'تسویه کامل', payHalf: 'نصف مانده', partialHint: 'پرداخت ناقص · {{r}} باقی می‌ماند', methodLabel: 'روش پرداخت',
-    forTerm: 'بابت', general: 'عمومی', paymentSaved: 'پرداخت {{amount}} ثبت شد', voidConfirm: 'این پرداخت باطل شود؟',
+    forTerm: 'بابت', general: 'عمومی', debtsByClass: 'بدهی‌ها به تفکیک کلاس', allDebts: 'همه بدهی‌ها (عمومی)', forClass: 'بابت کلاس', payForClass: 'تسویه {{name}}', paymentSaved: 'پرداخت {{amount}} ثبت شد', voidConfirm: 'این پرداخت باطل شود؟',
   },
   training: {
     title: 'برنامه‌های تمرینی', myPlan: 'برنامه تمرینی من', newPlan: 'برنامه جدید', empty: 'برنامه تمرینی ثبت نشده',
@@ -220,7 +223,12 @@ const fa = {
   makeups: {
     title: 'جلسات جبرانی', subtitle: 'جلساتی که باید جبران شوند', cancelledOn: 'لغو شده: {{d}}', dismiss: 'نیازی نیست', empty: 'جبرانی در انتظار ندارید',
   },
-  notifications: { title: 'اعلان‌ها', readAll: 'خواندن همه', empty: 'اعلانی ندارید' },
+  notifications: {
+    title: 'اعلان‌ها', readAll: 'خواندن همه', empty: 'اعلانی ندارید',
+    detailTitle: 'مشاهده پیام اعلان', viewSession: 'مشاهده جلسه تمرینی',
+    viewPlan: 'مشاهده برنامه تمرینی', viewPayments: 'مشاهده امور مالی و پرداخت‌ها',
+    viewClass: 'مشاهده کلاس', unread: 'خوانده‌نشده',
+  },
   profile: {
     title: 'پروفایل و تنظیمات', tools: 'ابزارها', chargeRules: 'قانون محاسبه جلسات',
     chargeRulesHint: 'مشخص کنید در هر وضعیت، جلسه از اعتبار شاگرد کسر شود یا نه. هنگام ثبت حضور می‌توانید برای هر مورد استثنا قائل شوید.',
@@ -229,6 +237,9 @@ const fa = {
     version: 'نسخه {{v}}',
   },
   student: {
+    coachName: 'مربی: {{name}}',
+    debtsByClass: 'بدهی‌ها به تفکیک کلاس',
+    classDebtSettled: 'تسویه کامل',
     remainingSessions: 'جلسات باقی‌مانده', tuitionStatus: 'وضعیت شهریه', myTerms: 'ترم‌های من', history: 'سابقه جلسات', myAccount: 'حساب من',
     noClasses: 'هنوز در کلاسی ثبت نشده‌اید', notLinked: 'حساب شما هنوز به مربی متصل نیست',
     notLinkedHint: 'کد اختصاصی اتصال مربی را در بخش مدیریت مربیان وارد کنید تا به پنل مربی متصل شوید.',

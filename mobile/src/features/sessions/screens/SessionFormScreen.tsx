@@ -6,8 +6,8 @@ import dayjs from 'dayjs';
 import { useCreateMakeup, useCreateSession, useMakeupSuggestions, useSession } from '../api';
 import { useClasses, useTerms } from '@/features/classes/api';
 import { AppText, Button, Card, Chips, DateField, Header, PressableScale, Screen, SectionHeader, TextField, TimeField } from '@/shared/components';
-import { classTypeColors, colors, radius, spacing } from '@/shared/theme';
-import { formatDate, formatTime } from '@/shared/utils/format';
+import { colors, getClassColor, radius, spacing } from '@/shared/theme';
+import { formatDate, formatMoney, formatTime } from '@/shared/utils/format';
 import { combineDateTime, toISODate } from '@/shared/utils/dates';
 import { useFeedback } from '@/shared/hooks/useFeedback';
 import { errorMessage } from '@/shared/utils/errors';
@@ -96,10 +96,19 @@ export function SessionFormScreen() {
       {!isMakeup ? (
         <>
           <SectionHeader title={t('terms.step.class')} />
-          <Chips scroll value={classId} onChange={(v) => { setClassId(v); setTermId(''); }} options={(classes.data ?? []).map((c) => ({ value: c.id, label: c.name, color: classTypeColors[c.class_type].main }))} />
+          <Chips scroll value={classId} onChange={(v) => { setClassId(v); setTermId(''); }} options={(classes.data ?? []).map((c) => ({ value: c.id, label: c.name, color: getClassColor(c.class_type, c.color).main }))} />
           {terms.data?.length ? (
             <Chips scroll size="sm" label={t('sessions.linkTerm')} value={termId} onChange={setTermId}
               options={[{ value: '', label: t('sessions.noTerm') }, ...terms.data.map((x) => ({ value: x.id, label: x.title }))]} />
+          ) : null}
+          {cls && !termId ? (
+            <Card tone="muted" style={{ gap: 4, marginTop: spacing.sm }}>
+              <AppText variant="caption" muted>{t('sessions.freeSessionPriceNotice')}</AppText>
+              <AppText variant="bodyMedium" color={colors.primaryDark} style={{ fontFamily: 'Vazirmatn_700Bold' }}>
+                {`${formatMoney(cls.session_price)} / ${t('common.session')}`}
+                <AppText variant="caption" muted>{` (${t(`classes.billing.${cls.billing_mode}`)})`}</AppText>
+              </AppText>
+            </Card>
           ) : null}
         </>
       ) : null}
