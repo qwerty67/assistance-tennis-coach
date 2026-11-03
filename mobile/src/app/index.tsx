@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+﻿import { Redirect } from 'expo-router';
 import { useAuth } from '@/features/auth/store';
 import { LoadingView } from '@/shared/components';
 
@@ -7,6 +7,9 @@ export default function Index() {
   if (status === 'loading') return <LoadingView />;
   if (status === 'guest' || !user) return <Redirect href="/login" />;
   if (user.role === 'coach') {
+    if (process.env.EXPO_PUBLIC_APP_MODE === 'pilot') {
+      return <Redirect href="/coach/pilot" />;
+    }
     if (!user.has_active_subscription) {
       return <Redirect href="/coach/subscription" />;
     }

@@ -48,6 +48,19 @@ export function CoachDashboardScreen() {
         <SkeletonList rows={5} />
       ) : (
         <>
+          <PressableScale onPress={() => router.push('/coach/pilot')} style={{ marginBottom: spacing.xs }}>
+            <Card style={{ backgroundColor: '#0F172A', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#1E293B' }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="robot-outline" size={16} color="#10B981" />
+                  <AppText variant="caption" style={{ color: '#10B981', fontWeight: 'bold' }}>TennisPilot هوش مصنوعی</AppText>
+                </View>
+                <AppText variant="body" style={{ color: '#F8FAFC', fontWeight: 'bold' }}>ثبت و آنالیز هوشمند مسابقات تنیس</AppText>
+              </View>
+              <Icon name="chevron-left" size={22} color="#94A3B8" />
+            </Card>
+          </PressableScale>
+
           <NextSessionHero session={data.next_session} onOpen={data.next_session ? () => router.push(`/coach/session/${data.next_session!.id}`) : undefined} />
 
           <QuickActions actions={[

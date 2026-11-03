@@ -1,0 +1,16 @@
+{
+  "name": "coach-assistant-platform",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Unified platform ecosystem for sports coaching and TennisPilot AI match intelligence",
+  "scripts": {
+    "start": "run-together.bat",
+    "start:together": "run-together.bat",
+    "start:pilot": "run-pilot-only.bat",
+    "start:coach": "run-coach-only.bat",
+    "start:backend": "cd backend && call .venv\\Scripts\\activate && uvicorn app.main:app --reload --port 8000",
+    "start:pilot-ui": "cd apps/tennis-pilot/ui && npx expo start --web",
+    "start:coach-ui": "cd mobile && npx expo start",
+    "test:backend": "cd backend && pytest"
+  }
+}
