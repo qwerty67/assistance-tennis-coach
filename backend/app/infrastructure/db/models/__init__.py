@@ -15,3 +15,4 @@ from app.infrastructure.db.models.notifications import Notification  # noqa
 from app.apps.coach_wallet.models import CoachWallet, WalletTransaction, SettlementRequest  # noqa
 from app.apps.payments_gateway.models import OnlinePaymentTransaction  # noqa
 from app.apps.ai_engine.models import AIInteractionLog  # noqa
+from app.apps.tennis_pilot.models import PilotMatch, PilotPoint, PilotAnalysis  # noqa

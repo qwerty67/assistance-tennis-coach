@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "TennisPilot",
+    "slug": "tennispilot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/TP-icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/TP-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tennispilot.frontend"
+    },
+    "web": {
+      "favicon": "./assets/TP-icon.png"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/TP-logo-app.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "66b3b856-12bd-4682-ae42-0c79a00e9d1a"
+      }
+    },
+    "owner": "samanmaleki"
+  }
+}

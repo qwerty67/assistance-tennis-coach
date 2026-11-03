@@ -1,3 +1,4 @@
+from app.apps.tennis_pilot.router import router as tennis_pilot_router
 from fastapi import APIRouter
 
 from app.api.v1.routers import (
@@ -15,3 +16,4 @@ for r in (auth, students, invitations, classes, sessions, finance, training, me,
 api_router.include_router(wallet_router)
 api_router.include_router(payments_gateway_router)
 api_router.include_router(ai_engine_router)
+api_router.include_router(tennis_pilot_router)

@@ -1,0 +1,16 @@
+{
+  "app": "tennis-pilot",
+  "port": 8000,
+  "python": {
+    "version": "3.11"
+  },
+  "build": {
+    "location": "iran"
+  },
+  "disks": [
+    {
+      "name": "project-disk",
+      "mountTo": "/project"
+    }
+  ]
+}
