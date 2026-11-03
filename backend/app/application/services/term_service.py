@@ -13,7 +13,7 @@ from app.application.services.notification_service import NotificationService
 from app.application.services.usage import remaining_sessions, session_counts, used_sessions
 from app.core.exceptions import ValidationError
 from app.domain.enums import (
-    BillingMode, NotificationType, ScheduleType, SessionChangeType, SessionStatus, TermStatus, TermType,
+    BillingMode, NotificationType, ScheduleType, SessionChangeType, SessionStatus, StudentStatus, TermStatus, TermType,
 )
 from app.domain.pricing import PriceBreakdown, per_student_shares
 from app.domain.scheduling import Slot, generate_custom, generate_recurring
@@ -43,7 +43,7 @@ class TermService:
         members = []
         for m in t.members:
             s = self.db.get(Student, m.student_id)
-            if not s:
+            if not s or s.deleted_at is not None or s.status != StudentStatus.ACTIVE:
                 continue
             lines = [x for x in self.finance.charges_with_status(s, today) if x["term_id"] == t.id]
             acc = s.account
@@ -67,6 +67,9 @@ class TermService:
         )
         return d
 
+    def _term_has_members(self, term_id: uuid.UUID) -> bool:
+        return bool(self.db.scalar(select(TermMember.id).where(TermMember.term_id == term_id).limit(1)))
+
     def list(self, actor: Actor, class_id=None, student_id=None, status=None) -> list[dict]:
         stmt = select(Term).where(Term.coach_id == actor.coach_id, Term.deleted_at.is_(None))
         if class_id:
@@ -75,7 +78,11 @@ class TermService:
             stmt = stmt.join(TermMember, TermMember.term_id == Term.id).where(TermMember.student_id == student_id)
         if status:
             stmt = stmt.where(Term.status == status)
-        return [self.to_out(actor, t) for t in self.db.scalars(stmt.order_by(Term.start_date.desc()))]
+        terms = [self.to_out(actor, t) for t in self.db.scalars(stmt.order_by(Term.start_date.desc()))]
+        if actor.coach and not student_id:
+            # If a term has enrolled members but all of them are inactive, archive/hide it from general active terms list
+            terms = [t for t in terms if len(t.get("members", [])) > 0 or not self._term_has_members(t["id"])]
+        return terms
 
     def get(self, actor: Actor, term_id: uuid.UUID) -> dict:
         return self.to_out(actor, self.repo.get_owned(Term, term_id, actor.coach_id))

@@ -13,13 +13,13 @@ from app.application.schemas.students import (
 from app.application.services.finance_service import FinanceService
 from app.application.services.invitation_service import InvitationService
 from app.application.services.usage import remaining_sessions, upcoming_sessions, used_sessions
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.enums import (
     InvitationChannel, InvitationStatus, RelationshipStatus, StudentStatus, UserRole,
 )
 from app.infrastructure.db.models import (
-    Attendance, ClassMember, Coach, CoachInvitation, CoachStudentRelationship, FinancialAccount,
-    Student, TennisClass, Term, TermMember, TrainingPlan, TrainingSession, User,
+    Attendance, Charge, ClassMember, Coach, CoachInvitation, CoachStudentRelationship, FinancialAccount,
+    MakeupSession, Payment, Student, TennisClass, Term, TermMember, TrainingPlan, TrainingSession, User,
 )
 from app.infrastructure.db.types import utcnow
 from app.infrastructure.repositories.base import Repository
@@ -30,6 +30,36 @@ class StudentService:
         self.db = db
         self.repo = Repository(db)
 
+    def has_operational_history(self, student_id: uuid.UUID) -> bool:
+        """Checks if student has any operational history:
+        - Class enrollment (ClassMember)
+        - Term enrollment (TermMember or Term.payer_student_id)
+        - Attendance records (Attendance)
+        - Financial transactions or debt (Payment, Charge, FinancialAccount non-zero)
+        - Training plans (TrainingPlan)
+        - Makeup sessions (MakeupSession)
+        """
+        if self.db.scalar(select(ClassMember.id).where(ClassMember.student_id == student_id).limit(1)):
+            return True
+        if self.db.scalar(select(TermMember.id).where(TermMember.student_id == student_id).limit(1)):
+            return True
+        if self.db.scalar(select(Term.id).where(Term.payer_student_id == student_id).limit(1)):
+            return True
+        if self.db.scalar(select(Attendance.id).where(Attendance.student_id == student_id).limit(1)):
+            return True
+        if self.db.scalar(select(Payment.id).where(Payment.student_id == student_id).limit(1)):
+            return True
+        if self.db.scalar(select(Charge.id).where(Charge.student_id == student_id).limit(1)):
+            return True
+        acc = self.db.scalar(select(FinancialAccount).where(FinancialAccount.student_id == student_id))
+        if acc and (acc.total_charged > 0 or acc.total_paid > 0 or acc.balance != 0 or acc.overdue_amount > 0):
+            return True
+        if self.db.scalar(select(TrainingPlan.id).where(TrainingPlan.student_id == student_id).limit(1)):
+            return True
+        if self.db.scalar(select(MakeupSession.id).where(MakeupSession.student_id == student_id).limit(1)):
+            return True
+        return False
+
     def _to_out(self, s: Student, actor: Actor | None = None) -> dict:
         d = {c: getattr(s, c) for c in (
             "id", "first_name", "last_name", "age", "birth_date", "phone", "email", "level", "start_date",
@@ -39,6 +69,7 @@ class StudentService:
             d["first_name"] = s.user.first_name
             d["last_name"] = s.user.last_name
         d["has_account"] = s.user_id is not None
+        d["can_delete"] = not self.has_operational_history(s.id)
         a = s.account
         d["account"] = {"total_charged": a.total_charged, "total_paid": a.total_paid, "balance": a.balance,
                         "overdue_amount": a.overdue_amount, "status": a.status} if a else None
@@ -175,25 +206,26 @@ class StudentService:
             rel.status = RelationshipStatus.ACTIVE if status == StudentStatus.ACTIVE else RelationshipStatus.INACTIVE
             if status != StudentStatus.ACTIVE:
                 rel.deactivated_at = utcnow()
+            else:
+                rel.deactivated_at = None
         self.db.commit()
         return self._to_out(s, actor)
 
     def delete(self, actor: Actor, student_id: uuid.UUID) -> None:
-        """Soft delete keeps the financial and session history intact."""
+        """Permanent delete is only allowed if student has NO operational history.
+        Otherwise, deletion is rejected with ValidationError and coach must deactivate instead.
+        """
         s = self.repo.get_owned(Student, student_id, actor.coach_id)
-        s.deleted_at = utcnow()
-        s.status = StudentStatus.INACTIVE
-        s.version += 1
-        rel = self.db.scalar(select(CoachStudentRelationship).where(
-            CoachStudentRelationship.coach_id == actor.coach_id,
-            CoachStudentRelationship.student_id == s.id,
-        ))
-        if rel:
-            rel.status = RelationshipStatus.INACTIVE
-            rel.is_primary = False
-            rel.deactivated_at = utcnow()
-        for m in self.db.scalars(select(ClassMember).where(ClassMember.student_id == s.id)):
-            m.is_active = False
+        if self.has_operational_history(s.id):
+            raise ValidationError(
+                "امکان حذف این شاگرد وجود ندارد زیرا دارای سوابق کلاسی، ترمی، مالی یا تمرینی است. برای عدم نمایش در صفحات اصلی، می‌توانید شاگرد را غیرفعال (بایگانی) کنید.",
+                code="cannot_delete_student_with_history",
+            )
+        # Student has only personal info: clean up relationships, invitations, empty account and delete
+        self.db.query(CoachInvitation).filter(CoachInvitation.student_id == s.id).delete(synchronize_session=False)
+        self.db.query(CoachStudentRelationship).filter(CoachStudentRelationship.student_id == s.id).delete(synchronize_session=False)
+        self.db.query(FinancialAccount).filter(FinancialAccount.student_id == s.id).delete(synchronize_session=False)
+        self.db.delete(s)
         self.db.commit()
 
     def disconnect(self, actor: Actor, student_id: uuid.UUID) -> dict:
@@ -360,7 +392,7 @@ class StudentService:
             .order_by(TrainingSession.start_at.desc())
         ).all()
         out["attendance_stats"] = dict(Counter(a.status.value for a, _, _ in att_rows))
-        out["recent_attendance"] = [\
+        out["recent_attendance"] = [
             {"id": str(a.id), "session_id": str(a.session_id), "status": a.status.value,
              "absence_reason": a.absence_reason.value if a.absence_reason else None, "note": a.note,
              "is_chargeable": a.is_chargeable, "start_at": st.isoformat(), "class_name": cn}

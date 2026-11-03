@@ -17,6 +17,9 @@ class SessionCreate(BaseModel):
     notes: str | None = None
     is_makeup: bool = False
     makeup_for_id: uuid.UUID | None = None
+    session_price: int | None = None
+    court_cost: int | None = None
+    coach_income: int | None = None
 
     @model_validator(mode="after")
     def order(self):

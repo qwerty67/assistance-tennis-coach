@@ -105,6 +105,7 @@ class StudentOut(StudentBase, ORMModel):
     relationship_status: RelationshipStatus = RelationshipStatus.ACTIVE
     is_primary: bool = False
     has_account: bool = False
+    can_delete: bool = True
     created_at: datetime
     updated_at: datetime
     account: AccountOut | None = None

@@ -15,7 +15,7 @@ import {
 } from '../api';
 import {
   AppText, AttendanceBadge, Avatar, Badge, Button, Card, ChargeBadge, ClassTypeBadge, EmptyState, ErrorView, FinancialBadge,
-  Header, IconButton, KeyValue, ListRow, LoadingView, ProgressBar, Screen, SectionHeader, SegmentedControl,
+  Header, Icon, IconButton, KeyValue, ListRow, LoadingView, ProgressBar, Screen, SectionHeader, SegmentedControl,
 } from '@/shared/components';
 import { attendanceColors, colors, financialStatusColors, spacing } from '@/shared/theme';
 import { digits, formatDate, formatMoney } from '@/shared/utils/format';
@@ -268,10 +268,25 @@ export function StudentDetailScreen() {
             <ListRow
               icon={s.status === 'active' ? 'pause-circle-outline' : 'play-circle-outline'}
               title={s.status === 'active' ? t('students.deactivate') : t('students.activate')}
+              subtitle={s.status === 'active' ? t('students.deactivateHint') : t('students.activateHint')}
               onPress={() => status.mutate(s.status !== 'active')}
-              divider
+              divider={s.can_delete !== false}
             />
-            <ListRow icon="trash-can-outline" title={t('students.delete')} onPress={onDelete} />
+            {s.can_delete !== false ? (
+              <ListRow icon="trash-can-outline" title={t('students.delete')} onPress={onDelete} />
+            ) : (
+              <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.sm, gap: spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Icon name="information-outline" size={18} color={colors.textMuted} />
+                  <AppText variant="small" style={{ fontWeight: '600' }} muted>
+                    {t('students.cannotDeleteTitle')}
+                  </AppText>
+                </View>
+                <AppText variant="caption" muted style={{ lineHeight: 18 }}>
+                  {t('students.cannotDeleteExplanation')}
+                </AppText>
+              </View>
+            )}
           </Card>
         </>
       ) : null}
@@ -280,7 +295,7 @@ export function StudentDetailScreen() {
         <>
           <View style={styles.statRow}>
             {(['present', 'excused', 'unexcused', 'makeup'] as const).map((k) => (
-              <View key={k} style={[styles.stat, { backgroundColor: attendanceColors[k].soft }]}>\
+              <View key={k} style={[styles.stat, { backgroundColor: attendanceColors[k].soft }]}>
                 <AppText variant="h2" color={attendanceColors[k].main} align="center">{digits(s.attendance_stats[k] ?? 0)}</AppText>
                 <AppText variant="caption" color={attendanceColors[k].main} align="center">{t(`attendance.status.${k}`)}</AppText>
               </View>

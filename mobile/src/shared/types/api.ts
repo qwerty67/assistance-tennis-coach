@@ -75,7 +75,7 @@ export interface Student {
   id: UUID; first_name: string; last_name: string; age?: number | null; birth_date?: string | null;
   phone?: string | null; email?: string | null; level: PlayerLevel; start_date?: string | null;
   strengths?: string | null; weaknesses?: string | null; goals?: string | null; coach_notes?: string | null;
-  status: 'active' | 'inactive'; has_account: boolean; account?: Account | null; created_at: string; relationship_status?: RelationshipStatus; is_primary?: boolean; invitation?: CoachInvitation | null;
+  status: 'active' | 'inactive'; has_account: boolean; can_delete?: boolean; account?: Account | null; created_at: string; relationship_status?: RelationshipStatus; is_primary?: boolean; invitation?: CoachInvitation | null;
 }
 export interface TermUsage {
   term_id: UUID; term_title: string; class_id: UUID; class_name: string; class_type: ClassType;

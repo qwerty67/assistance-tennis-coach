@@ -11,7 +11,7 @@ from app.application.context import Actor
 from app.application.schemas.finance import ChargeCreate, PaymentCreate
 from app.core.exceptions import NotFoundError, ValidationError
 from app.domain import jalali
-from app.domain.enums import BillingMode, ChargeKind, NotificationType, PaymentPlan, RelationshipStatus, TermType
+from app.domain.enums import BillingMode, ChargeKind, NotificationType, PaymentPlan, RelationshipStatus, StudentStatus, TermType
 from app.domain.finance import ChargeLine, account_snapshot
 from app.domain.pricing import PriceBreakdown, split_amount
 from app.infrastructure.db.models import (
@@ -477,7 +477,9 @@ class FinanceService:
         accounts = list(self.db.scalars(
             select(FinancialAccount).where(FinancialAccount.coach_id == cid, FinancialAccount.status.in_(["debt", "overdue", "partial"]))
         ))
-        students = {s.id: s for s in self.db.scalars(select(Student).where(Student.coach_id == cid))}
+        students = {s.id: s for s in self.db.scalars(
+            select(Student).where(Student.coach_id == cid, Student.status == StudentStatus.ACTIVE, Student.deleted_at.is_(None))
+        )}
 
         # Breakdown by class
         by_class = defaultdict(lambda: {"charged": 0, "received": 0})
@@ -513,8 +515,8 @@ class FinanceService:
             "charged": sum(c.amount for c in p_charges),
             "coach_income": sum(c.coach_income_amount for c in p_charges),
             "court_cost": sum(c.court_cost_amount for c in p_charges),
-            "outstanding": sum(-a.balance for a in accounts if a.balance < 0),
-            "total_credit": sum(a.balance for a in accounts if a.balance > 0),
+            "outstanding": sum(-a.balance for a in accounts if a.balance < 0 and a.student_id in students),
+            "total_credit": sum(a.balance for a in accounts if a.balance > 0 and a.student_id in students),
             "debtors_count": len(debtors),
             "month_income": sum(p.amount for p in payments if m_start <= p.paid_at <= m_end),
             "year_income": sum(p.amount for p in payments if y_start <= p.paid_at <= today),

@@ -21,7 +21,7 @@ export function StudentsListScreen() {
     status: filter === 'active' || filter === 'inactive' ? filter : undefined,
   };
   const { data, isLoading, error, refetch, isRefetching } = useStudents(params);
-  const list = (data ?? []).filter((s) => filter !== 'debt' || (s.account && s.account.balance < 0));
+  const list = (data ?? []).filter((s) => filter !== 'debt' || (s.status === 'active' && s.account && s.account.balance < 0));
 
   return (
     <Screen overlay={<Fab icon="account-plus" label={t('students.add')} onPress={() => router.push('/coach/student/form')} />} scroll={false} padded={false} header={<Header title={t('students.title')} subtitle={data ? t('students.count', { n: digits(list.length) }) : undefined} large />}>

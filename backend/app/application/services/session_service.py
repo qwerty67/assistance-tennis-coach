@@ -13,7 +13,7 @@ from app.application.services.notification_service import NotificationService
 from app.application.services.usage import remaining_sessions
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.enums import (
-    AttendanceStatus, MakeupStatus, NotificationType, SessionChangeType, SessionStatus,
+    AttendanceStatus, MakeupStatus, NotificationType, SessionChangeType, SessionStatus, StudentStatus,
 )
 from app.infrastructure.db.models import (
     Attendance, ClassMember, MakeupSession, SessionChangeLog, Student, TennisClass, Term, TermMember,
@@ -41,7 +41,11 @@ class SessionService:
         ids = list(dict.fromkeys([*ids, *extra]))
         if not ids:
             return []
-        return list(self.db.scalars(select(Student).where(Student.id.in_(ids), Student.deleted_at.is_(None))))
+        return list(self.db.scalars(select(Student).where(
+            Student.id.in_(ids),
+            Student.deleted_at.is_(None),
+            Student.status == StudentStatus.ACTIVE,
+        )))
 
     def _log(self, actor: Actor, s: TrainingSession, ctype: SessionChangeType, old=(None, None), reason=None):
         self.db.add(SessionChangeLog(session_id=s.id, changed_by_user_id=actor.user.id, change_type=ctype,
@@ -96,7 +100,15 @@ class SessionService:
             stmt = stmt.where(TrainingSession.status == status)
         elif not include_cancelled:
             stmt = stmt.where(TrainingSession.status != SessionStatus.CANCELLED)
-        return [self.to_out(s) for s in self.db.scalars(stmt.order_by(TrainingSession.start_at).limit(1000))]
+
+        res = []
+        for s in self.db.scalars(stmt.order_by(TrainingSession.start_at).limit(1000)):
+            out = self.to_out(s)
+            # If coach is viewing sessions without filtering by student, hide scheduled sessions with no active students
+            if actor.coach and not student_id and s.status == SessionStatus.SCHEDULED and out.get("student_count", 0) == 0:
+                continue
+            res.append(out)
+        return res
 
     def _student_filter(self, student_ids):
         ids = list(student_ids) or [uuid.uuid4()]
@@ -117,6 +129,11 @@ class SessionService:
             raise NotFoundError("Session not found")
         return s
 
+    def history(self, actor: Actor, session_id: uuid.UUID) -> list[SessionChangeLog]:
+        self.get_entity(actor, session_id)
+        return list(self.db.scalars(select(SessionChangeLog).where(SessionChangeLog.session_id == session_id)
+                                    .order_by(SessionChangeLog.created_at.desc())))
+
     def detail(self, actor: Actor, session_id: uuid.UUID) -> dict:
         s = self.get_entity(actor, session_id)
         d = self.to_out(s)
@@ -128,8 +145,10 @@ class SessionService:
         if term:
             shares = {m.student_id: m.share_per_session for m in term.members}
         students = self.participants(s)
-        if not actor.coach:  # a student only sees himself
+        if not actor.coach:
             students = [st for st in students if st.id in actor.student_ids]
+        tclass = self.db.get(TennisClass, s.class_id)
+        default_price = s.session_price or (tclass.session_price if tclass else 0)
         d["students"] = []
         for st in students:
             a = att.get(st.id)
@@ -139,7 +158,7 @@ class SessionService:
                 "attendance_status": a.status.value if a else None,
                 "absence_reason": a.absence_reason.value if a and a.absence_reason else None,
                 "is_chargeable": a.is_chargeable if a else None,
-                "share": shares.get(st.id, s.session_price),
+                "share": shares.get(st.id, default_price),
                 "financial_status": acc.status if acc else "settled",
                 "balance": acc.balance if acc else 0,
                 "remaining_sessions": remaining_sessions(self.db, term, st.id) if term else None,
@@ -153,36 +172,37 @@ class SessionService:
             d["coach_income"] = d["court_cost"] = 0
         return d
 
-    def history(self, actor: Actor, session_id: uuid.UUID) -> list[SessionChangeLog]:
-        self.get_entity(actor, session_id)
-        return list(self.db.scalars(select(SessionChangeLog).where(SessionChangeLog.session_id == session_id)
-                                    .order_by(SessionChangeLog.created_at.desc())))
-
-    # ------------------------------------------------------------------ commands
+    # ------------------------------------------------------------------ mutations
     def create(self, actor: Actor, data: SessionCreate) -> dict:
         c = self.repo.get_owned(TennisClass, data.class_id, actor.coach_id)
         term = self.repo.get_owned(Term, data.term_id, actor.coach_id) if data.term_id else None
-        if term and term.class_id != c.id:
-            raise ValidationError("Term does not belong to this class", code="term_mismatch")
-        if data.makeup_for_id:
-            self.repo.get_owned(TrainingSession, data.makeup_for_id, actor.coach_id)
-        src = term or c
+        if data.end_at <= data.start_at:
+            raise ValidationError("end_at must be after start_at", code="invalid_time")
+        # coach conflict check
+        conflict = self.db.scalar(select(TrainingSession.id).where(
+            TrainingSession.coach_id == actor.coach_id, TrainingSession.deleted_at.is_(None),
+            TrainingSession.status != SessionStatus.CANCELLED,
+            TrainingSession.start_at < data.end_at, data.start_at < TrainingSession.end_at))
+        if conflict:
+            raise ConflictError("Coach already has a session in this window", code="time_conflict")
+        sp = data.session_price if data.session_price is not None else (term.session_price if term else c.session_price)
+        cc = data.court_cost if data.court_cost is not None else (term.court_cost if term else c.court_cost)
+        ci = data.coach_income if data.coach_income is not None else (term.coach_income if term else c.coach_income)
         s = TrainingSession(
-            id=data.id or uuid.uuid4(), coach_id=actor.coach_id, class_id=c.id, term_id=term.id if term else None,
-            start_at=data.start_at, end_at=data.end_at, status=SessionStatus.SCHEDULED,
-            is_makeup=data.is_makeup or bool(data.makeup_for_id), makeup_for_id=data.makeup_for_id,
-            session_price=src.session_price, court_cost=src.court_cost, coach_income=src.coach_income,
+            id=data.id or uuid.uuid4(), coach_id=actor.coach_id, class_id=c.id, term_id=data.term_id,
+            start_at=data.start_at, end_at=data.end_at, status=SessionStatus.SCHEDULED, is_makeup=data.is_makeup,
+            makeup_for_id=data.makeup_for_id, session_price=sp, court_cost=cc, coach_income=ci,
             location=data.location or c.location, notes=data.notes,
         )
         self.db.add(s)
         self.db.flush()
         self._log(actor, s, SessionChangeType.CREATED)
         self._renumber(s.term_id)
-        ntype = NotificationType.MAKEUP_CREATED if s.is_makeup else NotificationType.SESSION_CREATED
-        title = "جلسه جبرانی" if s.is_makeup else "جلسه جدید"
-        self.notifier.notify_students(self.participants(s), ntype, title,
-                                      f"{c.name} - {self._local(actor, s.start_at)}",
-                                      {"session_id": str(s.id), "start_at": s.start_at.isoformat()})
+        self.notifier.notify_students(
+            self.participants(s), NotificationType.SESSION_CREATED, "جلسه تمرینی جدید",
+            f"جلسه تمرینی جدید برای تاریخ {self._local(actor, s.start_at)} ثبت شد.",
+            {"session_id": str(s.id), "start_at": s.start_at.isoformat()},
+        )
         self.db.commit()
         return self.to_out(s)
 

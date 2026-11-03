@@ -12,7 +12,7 @@ from app.application.services.student_service import StudentService
 from app.application.services.training_service import TrainingService
 from app.application.services.usage import remaining_sessions
 from app.domain import jalali
-from app.domain.enums import MakeupStatus, RelationshipStatus, SessionStatus, TermStatus
+from app.domain.enums import MakeupStatus, RelationshipStatus, SessionStatus, StudentStatus, TermStatus
 from app.infrastructure.db.models import (
     ClassMember, Coach, CoachStudentRelationship, FinancialAccount, MakeupSession, Student, TennisClass, Term, TermMember, TrainingSession,
 )
@@ -40,7 +40,7 @@ class DashboardService:
             or (upcoming[0] if upcoming else None)
         cancelled = sessions.list(actor, now - timedelta(days=30), now + timedelta(days=30), status=SessionStatus.CANCELLED)
 
-        # students with low remaining sessions
+        # students with low remaining sessions (only active students)
         low = []
         for term in self.db.scalars(select(Term).where(Term.coach_id == cid, Term.deleted_at.is_(None),
                                                        Term.status == TermStatus.ACTIVE,
@@ -48,14 +48,20 @@ class DashboardService:
             for m in term.members:
                 rem = remaining_sessions(self.db, term, m.student_id)
                 st = self.db.get(Student, m.student_id)
-                if st and st.deleted_at is None:
+                if st and st.deleted_at is None and st.status == StudentStatus.ACTIVE:
                     low.append({"student_id": str(st.id), "name": st.full_name, "term_id": str(term.id),
                                 "term_title": term.title, "remaining": rem, "total": term.total_sessions})
         low.sort(key=lambda x: x["remaining"])
 
         summary = finance.summary(actor, months=6)
-        pending_makeups = self.db.scalar(select(func.count()).select_from(MakeupSession).where(
-            MakeupSession.coach_id == cid, MakeupSession.status == MakeupStatus.PENDING)) or 0
+        pending_makeups = self.db.scalar(select(func.count()).select_from(MakeupSession)
+            .join(Student, Student.id == MakeupSession.student_id)
+            .where(
+                MakeupSession.coach_id == cid,
+                MakeupSession.status == MakeupStatus.PENDING,
+                Student.status == StudentStatus.ACTIVE,
+                Student.deleted_at.is_(None),
+            )) or 0
         unmarked = [s for s in sessions.list(actor, now - timedelta(days=7), now, status=SessionStatus.SCHEDULED)
                     if s["end_at"] < now]
 
@@ -67,10 +73,11 @@ class DashboardService:
         if pending_makeups:
             reminders.append({"type": "makeup_pending", "count": pending_makeups,
                               "title": f"{pending_makeups} جلسه جبرانی در انتظار"})
-        overdue = [d for d in summary["debtors"] if d["overdue"] > 0]
+        overdue = [d for d in summary["debtors"] if d.get("overdue", 0) > 0 or d.get("overdue_amount", 0) > 0]
         if overdue:
+            amt = sum(d.get("overdue", d.get("overdue_amount", 0)) for d in overdue)
             reminders.append({"type": "overdue_payments", "count": len(overdue),
-                              "amount": sum(d["overdue"] for d in overdue),
+                              "amount": amt,
                               "title": f"{len(overdue)} شاگرد با پرداخت معوق"})
         ending = [x for x in low if x["remaining"] <= 2]
         if ending:
@@ -191,8 +198,9 @@ class DashboardService:
             pass
 
         return {
-            "profiles": [{"id": str(p.id), "full_name": p.full_name, "level": p.level.value,
-                          "coach_id": str(p.coach_id)} for p in profiles if p],
+            "profiles": [p.id for p in profiles if p],
+            "profiles_data": [{"id": str(p.id), "full_name": p.full_name, "level": p.level.value,
+                               "coach_id": str(p.coach_id)} for p in profiles if p],
             "active_coach": active_coach_info,
             "my_classes": [{"id": str(c.id), "name": c.name, "class_type": c.class_type.value, "color": c.color,
                             "duration_minutes": c.duration_minutes} for c in classes],

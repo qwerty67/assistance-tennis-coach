@@ -7,7 +7,7 @@ from app.application.context import Actor
 from app.application.schemas.classes import ClassCreate, ClassUpdate
 from app.application.services.notification_service import NotificationService
 from app.core.exceptions import ValidationError
-from app.domain.enums import BillingMode, ClassType, NotificationType
+from app.domain.enums import BillingMode, ClassType, NotificationType, StudentStatus
 from app.domain.pricing import PriceBreakdown
 from app.infrastructure.db.models import ClassMember, Student, TennisClass
 from app.infrastructure.db.types import utcnow
@@ -47,7 +47,13 @@ class ClassService:
             "court_cost", "coach_income", "monthly_fee", "billing_mode", "color", "location", "description",
             "is_active", "created_at")}
         active = [m for m in c.members if m.is_active]
-        students = {s.id: s for s in self.db.scalars(select(Student).where(Student.id.in_([m.student_id for m in active])))} if active else {}
+        students = {s.id: s for s in self.db.scalars(
+            select(Student).where(
+                Student.id.in_([m.student_id for m in active]),
+                Student.status == StudentStatus.ACTIVE,
+                Student.deleted_at.is_(None),
+            )
+        )} if active else {}
         d["members"] = [{"student_id": m.student_id, "full_name": students[m.student_id].full_name,
                          "level": students[m.student_id].level.value, "is_active": m.is_active}
                         for m in active if m.student_id in students]
