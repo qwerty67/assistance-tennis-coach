@@ -10,3 +10,8 @@ from app.infrastructure.db.models.attendance import Attendance  # noqa
 from app.infrastructure.db.models.finance import Charge, FinancialAccount, Payment  # noqa
 from app.infrastructure.db.models.training import TrainingExercise, TrainingPlan  # noqa
 from app.infrastructure.db.models.notifications import Notification  # noqa
+
+# Modular future apps models
+from app.apps.coach_wallet.models import CoachWallet, WalletTransaction, SettlementRequest  # noqa
+from app.apps.payments_gateway.models import OnlinePaymentTransaction  # noqa
+from app.apps.ai_engine.models import AIInteractionLog  # noqa

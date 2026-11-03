@@ -119,8 +119,8 @@ class FinanceService:
             if cid is not None and not cls and stats["charged"] == 0:
                 continue
             res.append({
-                "class_id": cid,
-                "class_name": cls.name if cls else "جلسات آزاد / بدون کلاس",
+                "class_id": cid if cls else None,
+                "class_name": cls.name if cls else "جلسات آزاد / سوابق قبلی",
                 "class_type": cls.class_type.value if cls else None,
                 "color": cls.color if cls else None,
                 "charged": stats["charged"],
@@ -379,10 +379,18 @@ class FinanceService:
         student = self._get_accessible_student(actor, data.student_id)
         term = None
         if data.term_id:
-            term = self.repo.get_owned(Term, data.term_id, actor.coach_id)
+            try:
+                term = self.repo.get_owned(Term, data.term_id, actor.coach_id)
+            except Exception as e:
+                log.warning("Gracefully ignoring non-existent or inaccessible term %s: %s", data.term_id, e)
+                term = None
         cid = data.class_id or (term.class_id if term else None)
         if cid:
-            self.repo.get_owned(TennisClass, cid, actor.coach_id)
+            try:
+                self.repo.get_owned(TennisClass, cid, actor.coach_id)
+            except Exception as e:
+                log.warning("Gracefully handling deleted/legacy class %s: %s", cid, e)
+                cid = None
 
         if data.id and self.db.get(Payment, data.id):
             p = self.db.get(Payment, data.id)

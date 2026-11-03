@@ -229,3 +229,83 @@ export interface SubscribeResult {
   subscription: CoachSubscriptionStatus;
   message: string;
 }
+
+
+// ======================== MODULAR APPS: WALLET, ONLINE PAYMENT & AI ========================
+export interface CoachWallet {
+  id: string;
+  coach_id: string;
+  balance: number;
+  pending_settlement: number;
+  iban?: string | null;
+  bank_name?: string | null;
+  account_holder?: string | null;
+}
+
+export interface SettlementRequest {
+  id: string;
+  coach_id: string;
+  amount: number;
+  status: 'pending' | 'processing' | 'completed' | 'rejected';
+  iban: string;
+  account_holder?: string | null;
+  tracking_code?: string | null;
+  created_at: string;
+  processed_at?: string | null;
+}
+
+export interface WalletTransaction {
+  id: string;
+  wallet_id: string;
+  amount: number;
+  tx_type: string;
+  reference_id?: string | null;
+  description?: string | null;
+  created_at: string;
+}
+
+export interface OnlinePaymentInitResponse {
+  transaction_id: string;
+  authority: string;
+  payment_url: string;
+}
+
+export interface OnlinePaymentVerifyResponse {
+  is_success: boolean;
+  status: string;
+  amount: number;
+  ref_id?: string | null;
+  message: string;
+}
+
+export interface AIDrill {
+  title: string;
+  category: string;
+  duration_minutes: number;
+  reps_or_sets: string;
+  description: string;
+}
+
+export interface AIWeeklyPlan {
+  week_number: number;
+  theme: string;
+  drills: AIDrill[];
+}
+
+export interface AITrainingPlanResponse {
+  title: string;
+  summary: string;
+  level: string;
+  weeks: AIWeeklyPlan[];
+  coach_tips: string[];
+}
+
+export interface AIStudentAnalysisResponse {
+  student_id: string;
+  student_name: string;
+  total_sessions_attended: number;
+  attendance_rate_percent: number;
+  key_strengths: string[];
+  areas_for_growth: string[];
+  recommended_focus: string;
+}

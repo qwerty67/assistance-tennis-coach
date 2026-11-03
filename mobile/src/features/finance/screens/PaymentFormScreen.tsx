@@ -53,8 +53,8 @@ export function PaymentFormScreen() {
         paid_at: date,
         method,
         description: desc?.trim() || null,
-        term_id: termId || null,
-        class_id: selectedClassId || term?.class_id || null,
+        term_id: (termId && termId.trim().length > 0) ? termId.trim() : null,
+        class_id: (selectedClassId && selectedClassId.trim().length > 0) ? selectedClassId.trim() : (term?.class_id || null),
       });
       fb.success(t('finance.paymentSaved', { amount: formatMoney(amount) }), true);
       router.back();

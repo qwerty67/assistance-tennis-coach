@@ -8,3 +8,12 @@ __pycache__/
 .env
 *.db
 .pytest_cache/
+
+.idea/
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+.expo/
+*.log
