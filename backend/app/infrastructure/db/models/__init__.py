@@ -1,0 +1,17 @@
+"""Import every model so Alembic / metadata.create_all see them."""
+from app.infrastructure.db.models.identity import Academy, Coach, DeviceToken, RefreshToken, User  # noqa
+from app.infrastructure.db.models.subscription import CoachSubscription  # noqa
+from app.infrastructure.db.models.students import CoachInvitation, CoachStudentRelationship, Student  # noqa
+from app.infrastructure.db.models.classes import (  # noqa
+    ClassMember, MakeupSession, Schedule, ScheduleSlot, SessionChangeLog, TennisClass, Term,
+    TermMember, TrainingSession,
+)
+from app.infrastructure.db.models.attendance import Attendance  # noqa
+from app.infrastructure.db.models.finance import Charge, FinancialAccount, Payment  # noqa
+from app.infrastructure.db.models.training import TrainingExercise, TrainingPlan  # noqa
+from app.infrastructure.db.models.notifications import Notification  # noqa
+
+# Modular future apps models
+from app.apps.coach_wallet.models import CoachWallet, WalletTransaction, SettlementRequest  # noqa
+from app.apps.payments_gateway.models import OnlinePaymentTransaction  # noqa
+from app.apps.ai_engine.models import AIInteractionLog  # noqa
