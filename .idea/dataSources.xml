@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="tennis_coach" uuid="de0a6875-804b-46c9-955f-bb7ffa2be5d1">
+    <data-source source="LOCAL" name="tennis_coach" uuid="6e033f4a-a39e-473e-8768-ce41660a0572">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:E:\Workstation\tennis-coach\tennis-coach\backend\tennis_coach.db</jdbc-url>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/products/coach-assistant/backend/tennis_coach.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
+    <data-source source="LOCAL" name="tennis" uuid="6979b0a7-5ee1-4dbd-b03c-5b729ce92145">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/products/ai-coach/backend/tennis.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>

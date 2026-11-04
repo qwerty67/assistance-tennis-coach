@@ -1,0 +1,21 @@
+{
+  "name": "coach-assistant-platform",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev:coach": "pnpm --filter tennis-coach-mobile start -- --clear",
+    "android:coach": "pnpm --filter tennis-coach-mobile android",
+    "dev:ai": "pnpm --filter @tennis-platform/mobile-ai-coach start -- --clear",
+    "android:ai": "pnpm --filter @tennis-platform/mobile-ai-coach android",
+    "build:packages": "pnpm --filter \"./packages/**\" build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
