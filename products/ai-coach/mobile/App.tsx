@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator, { AuthStack } from './src/navigation/AppNavigator';
 import { ToastProvider } from './src/context/ToastContext';
 import { ToastContainer } from './src/components/common';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, I18nManager, Platform } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -17,6 +17,11 @@ import {
     Vazirmatn_700Bold,
     Vazirmatn_800ExtraBold,
 } from '@expo-google-fonts/vazirmatn';
+
+if (Platform.OS !== 'web' && !I18nManager.isRTL) {
+    I18nManager.allowRTL(true);
+    I18nManager.forceRTL(true);
+}
 
 function AppContent() {
     const { colors, isDark } = useTheme();
@@ -46,7 +51,7 @@ function AppContent() {
     return (
         <>
             <StatusBar style={isDark ? 'light' : 'dark'} />
-            <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={{ flex: 1, backgroundColor: colors.background, direction: 'rtl' }}>
                 <NavigationContainer>
                     <ToastProvider>
                         {isAuthenticated ? <AppNavigator /> : <AuthStack />}

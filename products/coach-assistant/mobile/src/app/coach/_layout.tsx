@@ -11,7 +11,9 @@ export default function CoachLayout() {
   const segments = useSegments();
 
   useEffect(() => {
-    if (user?.role === 'coach') registerForPush();
+    if (user?.role === 'coach') {
+      registerForPush().catch(() => {});
+    }
   }, [user?.role]);
 
   if (status !== 'authenticated') return <Redirect href="/login" />;

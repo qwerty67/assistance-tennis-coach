@@ -90,6 +90,17 @@ export class PointRecordingEngine {
     }
 
     /**
+     * Jump directly to final stroke recording
+     */
+    startFinalStroke(serveType: 'first' | 'second' = 'first'): void {
+        this.state.phase = 'final_stroke';
+        this.state.serveType = serveType;
+        this.state.serveResult = 'in';
+        this.state.returnResult = 'in';
+        this.state.isComplete = false;
+    }
+
+    /**
      * Get current recording state
      */
     getState(): RecordingState {
@@ -138,27 +149,27 @@ export class PointRecordingEngine {
         return [
             {
                 id: 'ace',
-                label: 'Ace',
-                description: 'Serve winner, opponent cannot touch',
+                label: 'ایس (Ace)',
+                description: 'امتیاز مستقیم سرویس اول',
                 category: 'success',
             },
             {
-                id: 'let',
-                label: 'Let',
-                description: 'Ball touches net, replay serve',
-                category: 'warning',
+                id: 'in',
+                label: 'داخل زمین (In Play)',
+                description: 'سرویس وارد زمین شد و رالی شروع شد',
+                category: 'neutral',
             },
             {
                 id: 'fault',
-                label: 'Fault',
-                description: 'Serve out, go to second serve',
+                label: 'خطای سرویس اول (Fault)',
+                description: 'سرویس خطا شد، رفتن به سرویس دوم',
                 category: 'error',
             },
             {
-                id: 'in',
-                label: 'In Play',
-                description: 'Serve in, opponent returns',
-                category: 'neutral',
+                id: 'let',
+                label: 'نت / تکرار (Let)',
+                description: 'برخورد به تور و افتادن در زمین، تکرار سرویس',
+                category: 'warning',
             },
         ];
     }
@@ -167,27 +178,27 @@ export class PointRecordingEngine {
         return [
             {
                 id: 'ace',
-                label: 'Ace',
-                description: 'Serve winner, opponent cannot touch',
+                label: 'ایس (Ace)',
+                description: 'امتیاز مستقیم سرویس دوم',
                 category: 'success',
             },
             {
-                id: 'let',
-                label: 'Let',
-                description: 'Ball touches net, replay serve',
-                category: 'warning',
+                id: 'in',
+                label: 'داخل زمین (In Play)',
+                description: 'سرویس دوم وارد زمین شد',
+                category: 'neutral',
             },
             {
                 id: 'double_fault',
-                label: 'Double Fault',
-                description: 'Second serve fault, point to opponent',
+                label: 'دوبل فالت (Double Fault)',
+                description: 'خطای سرویس دوم، امتیاز به حریف',
                 category: 'error',
             },
             {
-                id: 'in',
-                label: 'In Play',
-                description: 'Serve in, opponent returns',
-                category: 'neutral',
+                id: 'let',
+                label: 'نت / تکرار (Let)',
+                description: 'تکرار سرویس دوم',
+                category: 'warning',
             },
         ];
     }
@@ -195,43 +206,41 @@ export class PointRecordingEngine {
     private getReturnActions(): AvailableAction[] {
         return [
             {
-                id: 'error',
-                label: 'Error',
-                description: 'Return failed, point to server',
-                category: 'error',
+                id: 'in',
+                label: 'دریافت موفق / ادامه رالی (In Play)',
+                description: 'توپ دریافت شد و رالی ادامه یافت',
+                category: 'success',
             },
             {
-                id: 'in',
-                label: 'In Play',
-                description: 'Return successful, rally begins',
-                category: 'success',
+                id: 'error',
+                label: 'خطای دریافت (Return Error)',
+                description: 'دریافت سرویس خطا شد، امتیاز برای زننده سرویس',
+                category: 'error',
             },
         ];
     }
 
     private getFinalStrokeActions(): AvailableAction[] {
-        // This is more complex - UI will need to show multiple selections
-        // But we still define the structure here
         return [
             {
                 id: 'select_player',
-                label: 'Select Player',
-                description: 'Who hit the final stroke?',
+                label: 'انتخاب بازیکن',
+                description: 'چه کسی ضربه نهایی را زد؟',
             },
             {
                 id: 'select_type',
-                label: 'Select Stroke Type',
-                description: 'Type of stroke',
+                label: 'تکنیک ضربه',
+                description: 'نوع ضربه',
             },
             {
                 id: 'select_direction',
-                label: 'Select Direction',
-                description: 'Direction of stroke',
+                label: 'جهت / تاکتیک',
+                description: 'جهت ضربه',
             },
             {
                 id: 'select_result',
-                label: 'Select Result',
-                description: 'Outcome of stroke',
+                label: 'نتیجه ضربه',
+                description: 'نتیجه رالی',
             },
         ];
     }
@@ -255,7 +264,6 @@ export class PointRecordingEngine {
                 return this.handleReturn(actionId as ReturnResult);
 
             case 'final_stroke':
-                // Final stroke is handled separately via setFinalStroke
                 return false;
 
             default:
@@ -273,7 +281,6 @@ export class PointRecordingEngine {
                 return true;
 
             case 'let':
-                // Stay in first_serve, don't change state
                 return true;
 
             case 'fault':
@@ -302,7 +309,6 @@ export class PointRecordingEngine {
                 return true;
 
             case 'let':
-                // Stay in second_serve
                 return true;
 
             case 'double_fault':
@@ -363,7 +369,7 @@ export class PointRecordingEngine {
                 break;
 
             case 'forced_error':
-                this.state.pointWinner = data.player; // ← اصلاح شد
+                this.state.pointWinner = data.player;
                 break;
 
             case 'unforced_error':
@@ -406,7 +412,7 @@ export class PointRecordingEngine {
      * Convert current state to PointCreate for API
      */
     toPointCreate(
-        matchId: number,
+        matchId: number | string,
         pointNumber: number,
         setNumber: number,
         gameNumber: number,
@@ -417,7 +423,7 @@ export class PointRecordingEngine {
         }
 
         return {
-            match_id: matchId,
+            match_id: typeof matchId === 'number' ? matchId : parseInt(String(matchId), 10),
             point_number: pointNumber,
             set_number: setNumber,
             game_number: gameNumber,
@@ -444,17 +450,17 @@ export class PointRecordingEngine {
     getPhaseDisplayText(): string {
         switch (this.state.phase) {
             case 'idle':
-                return 'Ready to start';
+                return 'آماده شروع امتیاز';
             case 'first_serve':
-                return 'First Serve';
+                return 'سرویس اول (First Serve)';
             case 'second_serve':
-                return 'Second Serve';
+                return 'سرویس دوم (Second Serve)';
             case 'return':
-                return 'Return';
+                return 'دریافت سرویس (Return)';
             case 'final_stroke':
-                return 'Final Stroke';
+                return 'ضربه پایانی رالی (Final Stroke)';
             case 'completed':
-                return 'Point Complete';
+                return 'امتیاز ثبت شد';
             default:
                 return '';
         }
@@ -474,9 +480,3 @@ export class PointRecordingEngine {
         return this.state.server === 'student' ? opponentName : studentName;
     }
 }
-
-// ============================================
-// EXPORT SINGLETON (optional)
-// ============================================
-
-export const pointRecordingEngine = new PointRecordingEngine();

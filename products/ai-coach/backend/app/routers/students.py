@@ -1,24 +1,56 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import text
+from typing import List, Optional
 from app.database import get_db
 from app.models import Student, Match, Point
-from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse, StudentWithStats, StudentStats
+from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse, StudentWithStats
 from app.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter()
 
 
+def _get_coach_id_for_user(db: Session, user_id: str) -> Optional[str]:
+    """Find coach.id associated with user.id, or fallback to user_id"""
+    try:
+        row = db.execute(
+            text("SELECT id FROM coaches WHERE user_id = :uid"),
+            {"uid": str(user_id)}
+        ).fetchone()
+        if row and row[0]:
+            return str(row[0])
+    except Exception:
+        pass
+    return str(user_id)
+
+
 @router.post("/", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
-def create_student(student: StudentCreate, db: Session = Depends(get_db)):
+def create_student(
+    student: StudentCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
     """Create a new student in the central database"""
     parts = (student.name or "").strip().split(" ", 1)
     first_name = parts[0]
     last_name = parts[1] if len(parts) > 1 else ""
 
+    coach_id = _get_coach_id_for_user(db, current_user.id) if current_user else None
+
+    # If no coach_id yet, try to find any existing coach or default
+    if not coach_id:
+        try:
+            row = db.execute(text("SELECT id FROM coaches LIMIT 1")).fetchone()
+            if row and row[0]:
+                coach_id = str(row[0])
+        except Exception:
+            coach_id = str(uuid.uuid4())
+
     db_student = Student(
         id=str(uuid.uuid4()),
+        coach_id=coach_id,
         first_name=first_name,
         last_name=last_name,
         phone=student.phone,
@@ -32,9 +64,27 @@ def create_student(student: StudentCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=List[StudentWithStats])
-def get_students(skip: int = 0, limit: int = 50, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    """Get all students with complete statistics"""
-    students = db.query(Student).offset(skip).limit(limit).all()
+def get_students(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """Get students with complete statistics for current coach"""
+    query = db.query(Student)
+    if current_user:
+        coach_id = _get_coach_id_for_user(db, current_user.id)
+        if coach_id:
+            # Match by coach_id or also include orphaned students if empty
+            coach_students = query.filter(Student.coach_id == coach_id).offset(skip).limit(limit).all()
+            if coach_students:
+                students = coach_students
+            else:
+                students = query.offset(skip).limit(limit).all()
+        else:
+            students = query.offset(skip).limit(limit).all()
+    else:
+        students = query.offset(skip).limit(limit).all()
 
     result = []
     for student in students:

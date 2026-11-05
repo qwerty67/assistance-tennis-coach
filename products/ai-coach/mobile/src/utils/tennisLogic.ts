@@ -23,7 +23,7 @@ export const ValidValues = {
     // Return results
     RETURN_RESULTS: ['error', 'in'] as const,
 
-    // Stroke types
+    // Stroke types (Techniques)
     STROKE_TYPES: [
         // Groundstrokes
         'forehand',
@@ -41,7 +41,7 @@ export const ValidValues = {
         'smash'
     ] as const,
 
-    // Directions
+    // Directions (Tactics)
     DIRECTIONS: [
         'cross_court',
         'down_the_line',
@@ -51,7 +51,7 @@ export const ValidValues = {
         'short_angle'
     ] as const,
 
-    // Final stroke results
+    // Final stroke results (States / Outcomes)
     FINAL_STROKE_RESULTS: ['winner', 'forced_error', 'unforced_error', 'net'] as const,
 
     // Match status
@@ -77,7 +77,6 @@ export type MatchResult = typeof ValidValues.MATCH_RESULTS[number];
 // ============================================
 
 export const PointState = {
-    // States
     IDLE: 'idle',
     SERVING_FIRST: 'serving_first',
     SERVING_SECOND: 'serving_second',
@@ -144,71 +143,44 @@ export const PointStateMachine = {
 // ============================================
 
 export const TennisValidator = {
-    /**
-     * Validate player value
-     */
     validatePlayer(player: string): player is Player {
         return ValidValues.PLAYERS.includes(player as Player);
     },
 
-    /**
-     * Validate serve type
-     */
     validateServeType(serveType?: string): boolean {
         if (!serveType) return true;
         return ValidValues.SERVE_TYPES.includes(serveType as ServeType);
     },
 
-    /**
-     * Validate serve result
-     */
     validateServeResult(serveResult?: string): boolean {
         if (!serveResult) return true;
         return ValidValues.SERVE_RESULTS.includes(serveResult as ServeResult);
     },
 
-    /**
-     * Validate return result
-     */
     validateReturnResult(returnResult?: string): boolean {
         if (!returnResult) return true;
         return ValidValues.RETURN_RESULTS.includes(returnResult as ReturnResult);
     },
 
-    /**
-     * Validate stroke type
-     */
     validateStrokeType(strokeType?: string): boolean {
         if (!strokeType) return true;
         return ValidValues.STROKE_TYPES.includes(strokeType as StrokeType);
     },
 
-    /**
-     * Validate direction
-     */
     validateDirection(direction?: string): boolean {
         if (!direction) return true;
         return ValidValues.DIRECTIONS.includes(direction as Direction);
     },
 
-    /**
-     * Validate final stroke result
-     */
     validateFinalStrokeResult(result?: string): boolean {
         if (!result) return true;
         return ValidValues.FINAL_STROKE_RESULTS.includes(result as FinalStrokeResult);
     },
 
-    /**
-     * Validate match status
-     */
     validateMatchStatus(status: string): status is MatchStatus {
         return ValidValues.MATCH_STATUS.includes(status as MatchStatus);
     },
 
-    /**
-     * Validate match result
-     */
     validateMatchResult(result: string): result is MatchResult {
         return ValidValues.MATCH_RESULTS.includes(result as MatchResult);
     }
@@ -219,9 +191,6 @@ export const TennisValidator = {
 // ============================================
 
 export const PointWinnerCalculator = {
-    /**
-     * Calculate who won the point
-     */
     calculateWinner(
         server: Player,
         serveResult?: ServeResult,
@@ -256,9 +225,9 @@ export const PointWinnerCalculator = {
                 return finalStrokePlayer;
             }
 
-            // Forced Error - player who hit it wins (opponent couldn't return)
+            // Forced Error - player who hit it wins (forced error on opponent)
             if (finalStrokeResult === 'forced_error') {
-                return finalStrokePlayer; // ← اصلاح شد
+                return finalStrokePlayer;
             }
 
             // Unforced Error - opponent wins
@@ -281,9 +250,6 @@ export const PointWinnerCalculator = {
 // ============================================
 
 export const TennisHelpers = {
-    /**
-     * Get all valid values as a dictionary
-     */
     getValidValues() {
         return {
             players: [...ValidValues.PLAYERS],
@@ -298,53 +264,33 @@ export const TennisHelpers = {
         };
     },
 
-    /**
-     * Validate complete point data
-     */
     validatePointData(pointData: Partial<PointCreate>): { valid: boolean; errors: string[] } {
         const errors: string[] = [];
 
-        // Validate server
         if (pointData.server && !TennisValidator.validatePlayer(pointData.server)) {
             errors.push(`Invalid server: ${pointData.server}`);
         }
-
-        // Validate serve type
         if (pointData.serve_type && !TennisValidator.validateServeType(pointData.serve_type)) {
             errors.push(`Invalid serve_type: ${pointData.serve_type}`);
         }
-
-        // Validate serve result
         if (pointData.serve_result && !TennisValidator.validateServeResult(pointData.serve_result)) {
             errors.push(`Invalid serve_result: ${pointData.serve_result}`);
         }
-
-        // Validate return result
         if (pointData.return_result && !TennisValidator.validateReturnResult(pointData.return_result)) {
             errors.push(`Invalid return_result: ${pointData.return_result}`);
         }
-
-        // Validate final stroke player
         if (pointData.final_stroke_player && !TennisValidator.validatePlayer(pointData.final_stroke_player)) {
             errors.push(`Invalid final_stroke_player: ${pointData.final_stroke_player}`);
         }
-
-        // Validate final stroke type
         if (pointData.final_stroke_type && !TennisValidator.validateStrokeType(pointData.final_stroke_type)) {
             errors.push(`Invalid final_stroke_type: ${pointData.final_stroke_type}`);
         }
-
-        // Validate final stroke direction
         if (pointData.final_stroke_direction && !TennisValidator.validateDirection(pointData.final_stroke_direction)) {
             errors.push(`Invalid final_stroke_direction: ${pointData.final_stroke_direction}`);
         }
-
-        // Validate final stroke result
         if (pointData.final_stroke_result && !TennisValidator.validateFinalStrokeResult(pointData.final_stroke_result)) {
             errors.push(`Invalid final_stroke_result: ${pointData.final_stroke_result}`);
         }
-
-        // Validate point winner
         if (pointData.point_winner && !TennisValidator.validatePlayer(pointData.point_winner)) {
             errors.push(`Invalid point_winner: ${pointData.point_winner}`);
         }
@@ -355,73 +301,57 @@ export const TennisHelpers = {
         };
     },
 
-    /**
-     * Get display name for stroke type
-     */
     getStrokeTypeDisplayName(strokeType: StrokeType): string {
         const displayNames: Record<StrokeType, string> = {
-            forehand: 'Forehand',
-            backhand: 'Backhand',
-            slice: 'Slice',
-            drop_shot: 'Drop Shot',
-            lob: 'Lob',
-            passing_shot: 'Passing Shot',
-            forehand_volley: 'Forehand Volley',
-            backhand_volley: 'Backhand Volley',
-            half_volley: 'Half Volley',
-            drive_volley: 'Drive Volley',
-            swing_volley: 'Swing Volley',
-            smash: 'Smash'
+            forehand: 'فورهند (Forehand)',
+            backhand: 'بک‌هند (Backhand)',
+            slice: 'اسلایس (Slice)',
+            drop_shot: 'دراپ شات (Drop Shot)',
+            lob: 'لاب (Lob)',
+            passing_shot: 'پاسینگ شات (Passing Shot)',
+            forehand_volley: 'والی فورهند (F. Volley)',
+            backhand_volley: 'والی بک‌هند (B. Volley)',
+            half_volley: 'هاف والی (Half Volley)',
+            drive_volley: 'درایو والی (Drive Volley)',
+            swing_volley: 'سویینگ والی (Swing Volley)',
+            smash: 'اسمش (Smash)'
         };
         return displayNames[strokeType] || strokeType;
     },
 
-    /**
-     * Get display name for direction
-     */
     getDirectionDisplayName(direction: Direction): string {
         const displayNames: Record<Direction, string> = {
-            cross_court: 'Cross Court',
-            down_the_line: 'Down The Line',
-            inside_out: 'Inside Out',
-            inside_in: 'Inside In',
-            middle: 'Middle',
-            short_angle: 'Short Angle'
+            cross_court: 'مورب (Cross Court)',
+            down_the_line: 'موازی خط (Down The Line)',
+            inside_out: 'اینساید اوت (Inside Out)',
+            inside_in: 'اینساید این (Inside In)',
+            middle: 'وسط زمین (Middle)',
+            short_angle: 'زاویه تیز (Short Angle)'
         };
         return displayNames[direction] || direction;
     },
 
-    /**
-     * Get display name for serve result
-     */
     getServeResultDisplayName(serveResult: ServeResult): string {
         const displayNames: Record<ServeResult, string> = {
-            ace: 'Ace',
-            fault: 'Fault',
-            let: 'Let',
-            in: 'In',
-            double_fault: 'Double Fault'
+            ace: 'ایس (Ace)',
+            fault: 'خطا (Fault)',
+            let: 'نت / تکرار (Let)',
+            in: 'داخل زمین (In Play)',
+            double_fault: 'دوبل فالت (Double Fault)'
         };
         return displayNames[serveResult] || serveResult;
     },
 
-    /**
-     * Get display name for final stroke result
-     */
     getFinalStrokeResultDisplayName(result: FinalStrokeResult): string {
         const displayNames: Record<FinalStrokeResult, string> = {
-            winner: 'Winner',
-            forced_error: 'Forced Error',
-            unforced_error: 'Unforced Error',
-            net: 'Net'
+            winner: 'وینر - امتیاز مستقیم (Winner)',
+            forced_error: 'خطای تحمیلی (Forced Error)',
+            unforced_error: 'خطای غیرتحمیلی (Unforced Error)',
+            net: 'برخورد به تور (Net)'
         };
         return displayNames[result] || result;
     }
 };
-
-// ============================================
-// EXPORT ALL
-// ============================================
 
 export default {
     ValidValues,

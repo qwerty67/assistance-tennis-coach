@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Button, Dialog, Portal } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, Button } from 'react-native-paper';
 import { AppCard, LoadingScreen } from '../components/common';
 import { ScoreBoard, FinalStrokeForm } from '../components/match';
 import { matchService } from '../services/matchService';
@@ -11,9 +11,10 @@ import { ScoringEngine } from '../utils/scoringEngine';
 import { useToast } from '../context/ToastContext';
 import { ConfirmationDialog, ActionSheet } from '../components/common';
 import { CustomHeader } from '../components/common';
-import {MaterialCommunityIcons} from "@expo/vector-icons";
-import {studentService} from "../services/studentService";
-import {useTheme} from "../context/ThemeContext";
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { studentService } from '../services/studentService';
+import { useTheme } from '../context/ThemeContext';
+import { colors as dsColors, palette, radius, spacing } from '@tennis-platform/design-system';
 
 interface LiveMatchScreenProps {
     route: any;
@@ -26,18 +27,19 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
     const [points, setPoints] = useState<Point[]>([]);
     const [loading, setLoading] = useState(true);
     const toast = useToast();
-    const [studentName, setStudentName] = useState<string>('Student');
+    const [studentName, setStudentName] = useState<string>('شاگرد');
+    
     // Engines
     const [pointEngine] = useState(() => new PointRecordingEngine());
     const [scoringEngine] = useState(() => new ScoringEngine());
     const [endMatchDialogVisible, setEndMatchDialogVisible] = useState(false);
     const [undoDialogVisible, setUndoDialogVisible] = useState(false);
     const [moreActionsVisible, setMoreActionsVisible] = useState(false);
+    
     // UI State
     const [currentPhase, setCurrentPhase] = useState<RecordingPhase>('idle');
     const [, forceUpdate] = useState({});
     const { colors } = useTheme();
-
 
     useEffect(() => {
         loadMatchData();
@@ -46,26 +48,39 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
     const loadMatchData = async () => {
         try {
             setLoading(true);
-            const matchData = await matchService.getById(matchId);
-            setMatch(matchData);
-            console.log("matchData",matchData.data.student_id)
-            try {
-                const studentData = await studentService.getById(matchData?.data?.student_id);
-                setStudentName(studentData.data.name || 'Student');
-            } catch (e) {
-                console.log(e);
+            const rawMatch: any = await matchService.getById(matchId);
+            const resolvedMatch: Match = rawMatch?.data ?? rawMatch;
+            setMatch(resolvedMatch);
+
+            const studentId = resolvedMatch?.student_id ?? rawMatch?.student_id;
+            if (studentId) {
+                try {
+                    const rawStudent: any = await studentService.getById(studentId);
+                    const resolvedStudent = rawStudent?.data ?? rawStudent;
+                    const resolvedName =
+                        resolvedStudent?.name ||
+                        `${resolvedStudent?.first_name || ''} ${resolvedStudent?.last_name || ''}`.trim() ||
+                        'شاگرد';
+                    setStudentName(resolvedName);
+                } catch (e) {
+                    console.warn('Could not load student name:', e);
+                }
             }
+
             const pointsData = await matchService.getPoints(matchId);
-            setPoints(pointsData);
+            const resolvedPoints = Array.isArray(pointsData) ? pointsData : (pointsData as any)?.data ?? [];
+            setPoints(resolvedPoints);
 
             // Reconstruct scoring state
-            reconstructScoringState(pointsData);
+            reconstructScoringState(resolvedPoints);
 
-            // Start first point
-            pointEngine.startPoint(scoringEngine.getState().server);
+            // Initialize point engine with current server
+            const currentServer = scoringEngine.getState().server || 'student';
+            pointEngine.startPoint(currentServer);
             setCurrentPhase(pointEngine.getCurrentPhase());
         } catch (error) {
             console.error('Error loading match:', error);
+            toast.error('خطا در دریافت اطلاعات مسابقه');
         } finally {
             setLoading(false);
         }
@@ -74,11 +89,7 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
     const reconstructScoringState = (pointsData: Point[]) => {
         const engine = new ScoringEngine();
 
-        // اگر هیچ امتیازی ثبت نشده، مطمئن می‌شویم که state کاملاً ریست است
-        if (pointsData.length === 0) {
-            // فرض بر این است که ScoringEngine در حالت پیش‌فرض ۰-۰ است.
-            // اگر متد reset دارد، آن را صدا بزنید: engine.reset();
-        } else {
+        if (pointsData && pointsData.length > 0) {
             for (const point of pointsData) {
                 if (point.point_winner) {
                     engine.addPoint(point.point_winner);
@@ -93,10 +104,9 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
     // ============================================
 
     const handleAction = async (actionId: string) => {
-        // Let - just show message, don't change state
+        // Let - replay serve
         if (actionId === 'let') {
-            toast.info('Let - Serve will be replayed');
-            // Alert.alert('Let', 'Serve will be replayed');
+            toast.info('نت (Let) - تکرار سرویس');
             return;
         }
 
@@ -104,8 +114,7 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
         const success = pointEngine.performAction(actionId);
 
         if (!success) {
-            toast.error('Invalid action');
-            // Alert.alert('Error', 'Invalid action');
+            toast.error('عملیات نامعتبر است');
             return;
         }
 
@@ -113,9 +122,8 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
         if (pointEngine.isPointComplete()) {
             await savePoint();
         } else {
-            // Update UI phase
             setCurrentPhase(pointEngine.getCurrentPhase());
-            forceUpdate({}); // Force re-render
+            forceUpdate({});
         }
     };
 
@@ -128,8 +136,7 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
         const success = pointEngine.setFinalStroke(data);
 
         if (!success) {
-            toast.error('Failed to record final stroke');
-            // Alert.alert('Error', 'Failed to record final stroke');
+            toast.error('خطا در ثبت رویداد ضربه پایانی');
             return;
         }
 
@@ -138,7 +145,6 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
 
     const savePoint = async () => {
         try {
-            // ۱. دریافت داده خام از انجین
             const rawPointData = pointEngine.toPointCreate(
                 matchId,
                 points.length + 1,
@@ -147,63 +153,47 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
                 scoringEngine.getGameScoreDisplay()
             );
 
-            console.log("🔴 RAW Data from Engine:", JSON.stringify(rawPointData, null, 2));
+            if (!rawPointData) {
+                toast.error('اطلاعات امتیاز برای ذخیره کامل نیست');
+                return;
+            }
 
-            // ۲. تمیزکاری داده‌ها (حذف undefined و null)
-            // Pydantic V2 با فیلدهایی که مقدارشان undefined است، خطای 422 می‌دهد
+            // Remove null or undefined fields for clean Pydantic compatibility
             const cleanPointData = Object.fromEntries(
                 Object.entries(rawPointData).filter(([_, value]) => value !== undefined && value !== null)
             );
 
-            console.log("🟢 CLEAN Data to Send:", JSON.stringify(cleanPointData, null, 2));
+            await matchService.createPoint(matchId, cleanPointData as any);
 
-            // ۳. ارسال درخواست
-            await matchService.createPoint(matchId, cleanPointData);
-
-            // ... (بقیه کد موفقیت‌آمیز: update scoring, reset, loadMatchData) ...
             const winner = pointEngine.getPointWinner();
             if (winner) {
                 scoringEngine.addPoint(winner);
             }
+
             pointEngine.reset();
-            pointEngine.startPoint(scoringEngine.getState().server);
+            const nextServer = scoringEngine.getState().server || 'student';
+            pointEngine.startPoint(nextServer);
             setCurrentPhase(pointEngine.getCurrentPhase());
             forceUpdate({});
+            
+            toast.success('امتیاز ثبت شد');
             await loadMatchData();
-
         } catch (error: any) {
-            // ۴. چاپ فوق‌العاده دقیق خطا
-            console.error("========================================");
-            console.error("🚨🚨🚨 POINT SAVE FAILED 🚨🚨🚨");
-            console.error("========================================");
-
-            if (error.response) {
-                console.error("Status Code:", error.response.status);
-                console.error("Response Data (The Pydantic Error):", JSON.stringify(error.response.data, null, 2));
-
-                // استخراج پیام خطای خوانا برای Toast
-                const detail = error.response.data?.detail;
-                let errorMsg = "خطای نامشخص در ذخیره امتیاز";
-
-                if (Array.isArray(detail)) {
-                    // اگر خطا آرایه‌ای از فیلدهای نامعتبر باشد
-                    errorMsg = `خطا در فیلد: ${detail[0]?.loc?.join('.') || 'نامشخص'} - ${detail[0]?.msg || ''}`;
-                } else if (typeof detail === 'string') {
-                    errorMsg = detail;
-                }
-
-                toast.error(errorMsg);
-            } else {
-                console.error("Network or Other Error:", error.message);
-                toast.error("خطای شبکه یا سرور");
+            console.error('POINT SAVE FAILED:', error);
+            const detail = error?.response?.data?.detail;
+            let errorMsg = 'خطا در ثبت امتیاز در سرور';
+            if (Array.isArray(detail)) {
+                errorMsg = `خطا در فیلد: ${detail[0]?.loc?.join('.') || 'نامشخص'} - ${detail[0]?.msg || ''}`;
+            } else if (typeof detail === 'string') {
+                errorMsg = detail;
             }
-            console.error("========================================");
+            toast.error(errorMsg);
         }
     };
 
     const handleUndo = () => {
         if (points.length === 0) {
-            toast.info('No points to undo');
+            toast.info('امتیازی برای لغو وجود ندارد');
             return;
         }
         setUndoDialogVisible(true);
@@ -213,11 +203,11 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
         try {
             const lastPoint = points[points.length - 1];
             await matchService.deletePoint(matchId, lastPoint.id);
-            toast.success('Point undone');
+            toast.success('آخرین امتیاز با موفقیت لغو شد');
             await loadMatchData();
         } catch (error) {
             console.error('Error undoing point:', error);
-            toast.error('Failed to undo point');
+            toast.error('خطا در لغو امتیاز');
         } finally {
             setUndoDialogVisible(false);
         }
@@ -231,16 +221,15 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
                 final_result: result,
             });
 
-            toast.success('Match completed!');
+            toast.success('مسابقه با موفقیت پایان یافت');
             setEndMatchDialogVisible(false);
 
-            // کمی تاخیر برای نمایش toast قبل از navigation
             setTimeout(() => {
                 navigation.goBack();
-            }, 1000);
+            }, 800);
         } catch (error) {
             console.error('Error completing match:', error);
-            toast.error('Failed to complete match');
+            toast.error('خطا در ثبت پایان مسابقه');
         }
     };
 
@@ -249,18 +238,17 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
     };
 
     if (loading || !match) {
-        return <LoadingScreen />;
+        return <LoadingScreen message="در حال دریافت اطلاعات مسابقه..." />;
     }
 
-    // Get available actions from engine
     const availableActions = pointEngine.getAvailableActions();
-    const currentState = pointEngine.getState();
+    const serverName = pointEngine.getServerName(studentName, match.opponent_name);
 
     return (
-        <View style={[styles.container,{backgroundColor:colors.background}]}>
+        <View style={[styles.container, { backgroundColor: colors.background, direction: 'rtl' }]}>
             <CustomHeader
-                title="Live Match"
-                subtitle={match.opponent_name}
+                title="ثبت رویداد زنده مسابقه"
+                subtitle={`حریف: ${match.opponent_name}`}
                 onBack={() => navigation.goBack()}
                 rightAction={{
                     icon: 'dots-vertical',
@@ -268,38 +256,65 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
                 }}
             />
             <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-            {/* Score Board */}
+                {/* Score Board */}
                 <ScoreBoard
                     scoreState={scoringEngine.getState()}
-                    studentName={`${studentName} (Student)`}  // ✅ تغییر
+                    studentName={`${studentName} (شاگرد)`}
                     opponentName={match.opponent_name}
                 />
 
-            {/* Current Phase Display */}
+                {/* Current Phase Card */}
                 <AppCard style={styles.card}>
-                    <Text style={[styles.phaseTitle,{color:colors.text}]}>
-                        {pointEngine.getPhaseDisplayText()}
-                    </Text>
-                    <Text style={styles.phaseSubtitle}>
-                        Server: {pointEngine.getServerName(`${studentName}`, match.opponent_name)}
-                    </Text>
+                    <View style={styles.phaseHeaderRow}>
+                        <View style={styles.phaseBadge}>
+                            <MaterialCommunityIcons name="tennis" size={18} color={palette.lime400} />
+                            <Text style={styles.phaseBadgeText}>
+                                {pointEngine.getPhaseDisplayText()}
+                            </Text>
+                        </View>
+                        <Text style={[styles.serverText, { color: colors.textSecondary }]}>
+                            زننده سرویس: <Text style={{ fontWeight: 'bold', color: colors.text }}>{serverName}</Text>
+                        </Text>
+                    </View>
+
+                    {/* Quick jump to Final Stroke / Rally */}
+                    {currentPhase !== 'final_stroke' && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                pointEngine.startFinalStroke(currentPhase === 'second_serve' ? 'second' : 'first');
+                                setCurrentPhase('final_stroke');
+                                forceUpdate({});
+                            }}
+                            style={styles.quickRallyButton}
+                        >
+                            <MaterialCommunityIcons name="flash" size={16} color={palette.navy900} />
+                            <Text style={styles.quickRallyText}>
+                                ثبت مستقیم ضربه نهایی رالی (تکنیک / تاکتیک)
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </AppCard>
 
-            {/* Dynamic Action Buttons (Serve & Return) */}
+                {/* Dynamic Action Buttons (Serve & Return) */}
                 {(currentPhase === 'first_serve' || currentPhase === 'second_serve' || currentPhase === 'return') && (
                     <AppCard style={styles.card}>
-                        <View style={styles.buttonGroup}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                            {currentPhase === 'return' ? 'نتیجه دریافت سرویس (Return):' : 'نتیجه سرویس:'}
+                        </Text>
+                        <View style={styles.buttonGrid}>
                             {availableActions.map((action) => (
                                 <Button
                                     key={action.id}
                                     mode="contained"
                                     onPress={() => handleAction(action.id)}
                                     style={[
-                                        styles.button,
+                                        styles.actionButton,
                                         action.category === 'success' && styles.successButton,
                                         action.category === 'warning' && styles.warningButton,
                                         action.category === 'error' && styles.errorButton,
+                                        action.category === 'neutral' && styles.neutralButton,
                                     ]}
+                                    labelStyle={styles.actionButtonLabel}
                                 >
                                     {action.label}
                                 </Button>
@@ -308,172 +323,173 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
                     </AppCard>
                 )}
 
-            {/* Final Stroke Form */}
+                {/* Final Stroke Form (Technique, Tactic, State) */}
                 {currentPhase === 'final_stroke' && (
                     <FinalStrokeForm
                         onSubmit={handleFinalStroke}
                         onCancel={() => {
                             pointEngine.reset();
-                            pointEngine.startPoint(scoringEngine.getState().server);
+                            const currentSrv = scoringEngine.getState().server || 'student';
+                            pointEngine.startPoint(currentSrv);
                             setCurrentPhase(pointEngine.getCurrentPhase());
-                            // forceUpdate({});
+                            forceUpdate({});
                         }}
-                        studentName={`${studentName} (Student)`}  // ✅ تغییر
+                        studentName={studentName}
                         opponentName={match.opponent_name}
                     />
                 )}
 
-            {/* Control Buttons */}
+                {/* Control Buttons */}
                 <View style={styles.controlButtons}>
-                    <Button mode="outlined" onPress={handleUndo} style={styles.controlButton} icon="undo">
-                        Undo
+                    <Button
+                        mode="outlined"
+                        onPress={handleUndo}
+                        style={styles.controlButton}
+                        icon="undo"
+                        labelStyle={styles.controlButtonText}
+                    >
+                        لغو امتیاز (Undo)
                     </Button>
-                    <Button mode="contained" onPress={handleEndMatch} style={[styles.controlButton, styles.endButton]} icon="flag-checkered">
-                        End Match
+                    <Button
+                        mode="contained"
+                        onPress={handleEndMatch}
+                        style={[styles.controlButton, styles.endButton]}
+                        icon="flag-checkered"
+                        labelStyle={styles.controlButtonText}
+                    >
+                        اتمام بازی
                     </Button>
                 </View>
 
-            {/* Points Summary */}
+                {/* Points Summary / History */}
                 <AppCard style={styles.timelineCard}>
                     <View style={styles.timelineHeader}>
-                        <MaterialCommunityIcons name="history" size={20} color={COLORS.primary} />
-                        <Text style={[styles.timelineTitle,{color:colors.text}]}>Recent Points</Text>
+                        <MaterialCommunityIcons name="history" size={20} color={palette.navy800} />
+                        <Text style={[styles.timelineTitle, { color: colors.text }]}>
+                            امتیازات و رویدادهای اخیر
+                        </Text>
                     </View>
 
                     {points.length === 0 ? (
                         <View style={styles.emptyTimeline}>
-                            <MaterialCommunityIcons name="tennis-ball" size={32} color={COLORS.textTertiary || '#999'} />
-                            <Text style={styles.emptyText}>No points recorded yet</Text>
+                            <MaterialCommunityIcons name="tennis-ball" size={36} color={colors.textSecondary || '#999'} />
+                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                هنوز امتیازی برای این مسابقه ثبت نشده است.
+                            </Text>
                         </View>
                     ) : (
                         <View style={styles.timelineList}>
-                            {points.slice(-5).reverse().map((point, index, arr) => (
-                                <View key={point.id} style={styles.timelineItem}>
-                                    {/* خط عمودی اتصال دهنده */}
-                                    {index < arr.length - 1 && (
-                                        <View style={styles.timelineLine} />
-                                    )}
+                            {points.slice(-8).reverse().map((point, index, arr) => {
+                                const isStudentWinner = point.point_winner === 'student';
+                                return (
+                                    <View key={point.id || index} style={styles.timelineItem}>
+                                        {index < arr.length - 1 && <View style={styles.timelineLine} />}
 
-                                    {/* دایره وضعیت */}
-                                    <View style={[
-                                        styles.timelineDot,
-                                        { backgroundColor: point.point_winner === 'student' ? COLORS.success : COLORS.error }
-                                    ]}>
-                                        <MaterialCommunityIcons
-                                            name={point.point_winner === 'student' ? 'check' : 'close'}
-                                            size={16}
-                                            color="#FFF"
-                                        />
-                                    </View>
-
-                                    {/* محتوای امتیاز */}
-                                    <View style={styles.timelineContent}>
-                                        <Text style={[
-                                            styles.timelineWinner,
-                                            { color: point.point_winner === 'student' ? COLORS.success : COLORS.error }
+                                        <View style={[
+                                            styles.timelineDot,
+                                            { backgroundColor: isStudentWinner ? '#2E7D32' : '#C62828' }
                                         ]}>
-                                            {point.point_winner === 'student' ? 'Student Point' : 'Opponent Point'}
-                                        </Text>
-                                        <Text style={styles.timelineScore}>
-                                            Game Score: {point.game_score}
-                                        </Text>
+                                            <MaterialCommunityIcons
+                                                name={isStudentWinner ? 'check' : 'close'}
+                                                size={16}
+                                                color="#FFF"
+                                            />
+                                        </View>
+
+                                        <View style={styles.timelineContent}>
+                                            <Text style={[
+                                                styles.timelineWinner,
+                                                { color: isStudentWinner ? '#2E7D32' : '#C62828' }
+                                            ]}>
+                                                {isStudentWinner ? `امتیاز: ${studentName}` : `امتیاز: ${match.opponent_name}`}
+                                            </Text>
+                                            <Text style={styles.timelineScore}>
+                                                نتیجه گیم: {point.game_score}
+                                                {point.final_stroke_type ? ` • تکنیک: ${point.final_stroke_type}` : ''}
+                                                {point.serve_result === 'ace' ? ' • ایس' : ''}
+                                                {point.serve_result === 'double_fault' ? ' • دوبل فالت' : ''}
+                                            </Text>
+                                        </View>
                                     </View>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </View>
                     )}
                 </AppCard>
+            </ScrollView>
 
-            {/* End Match Dialog */}
-            <Portal>
-                <Dialog visible={endMatchDialogVisible} onDismiss={() => setEndMatchDialogVisible(false)}>
-                    <Dialog.Title>End Match</Dialog.Title>
-                    <Dialog.Content>
-                        <Text>Who won the match?</Text>
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <Button onPress={() => setEndMatchDialogVisible(false)}>Cancel</Button>
-                        <Button onPress={() => confirmEndMatch('loss')} textColor={COLORS.error}>
-                            Opponent
-                        </Button>
-                        <Button onPress={() => confirmEndMatch('win')} textColor={COLORS.success}>
-                            Student
-                        </Button>
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
-        </ScrollView>
-            {/* End Match Dialog */}
+            {/* End Match Confirmation Dialog */}
             <ConfirmationDialog
                 visible={endMatchDialogVisible}
-                title="End Match"
-                message="Are you sure you want to end this match? You won't be able to add more points."
+                title="اتمام مسابقه"
+                message="آیا مطمئن هستید که مسابقه به پایان رسیده است؟ برنده این مسابقه چه کسی است؟"
                 icon="flag-checkered"
                 iconColor={COLORS.warning}
                 onDismiss={() => setEndMatchDialogVisible(false)}
                 actions={[
                     {
-                        label: 'Cancel',
+                        label: 'انصراف',
                         onPress: () => setEndMatchDialogVisible(false),
                         variant: 'cancel',
                     },
                     {
-                        label: 'Opponent Won',
+                        label: 'برد حریف',
                         onPress: () => confirmEndMatch('loss'),
                         variant: 'destructive',
                         icon: 'account',
                     },
                     {
-                        label: 'You Won',
+                        label: 'برد شاگرد',
                         onPress: () => confirmEndMatch('win'),
                         variant: 'primary',
                         icon: 'trophy',
                     },
                 ]}
             />
+
             {/* Undo Dialog */}
             <ConfirmationDialog
                 visible={undoDialogVisible}
-                title="Undo Last Point"
-                message="Are you sure you want to delete the last point? This cannot be undone."
+                title="لغو آخرین امتیاز"
+                message="آیا مطمئن هستید که می‌خواهید آخرین امتیاز ثبت‌شده را حذف کنید؟ این عملیات قابل بازگشت نیست."
                 icon="undo"
                 iconColor={COLORS.warning}
                 onDismiss={() => setUndoDialogVisible(false)}
                 actions={[
                     {
-                        label: 'Cancel',
+                        label: 'انصراف',
                         onPress: () => setUndoDialogVisible(false),
                         variant: 'cancel',
                     },
                     {
-                        label: 'Undo',
+                        label: 'حذف و لغو امتیاز',
                         onPress: handleUndoConfirm,
                         variant: 'destructive',
                         icon: 'undo',
                     },
                 ]}
             />
+
             {/* More Actions ActionSheet */}
             <ActionSheet
                 visible={moreActionsVisible}
-                title="Match Actions"
+                title="عملیات مسابقه"
                 onDismiss={() => setMoreActionsVisible(false)}
                 items={[
                     {
-                        label: 'Undo Last Point',
+                        label: 'لغو آخرین امتیاز (Undo)',
                         icon: 'undo',
                         onPress: handleUndo,
                     },
                     {
-                        label: 'End Match',
+                        label: 'اتمام مسابقه',
                         icon: 'flag-checkered',
                         onPress: () => setEndMatchDialogVisible(true),
                     },
                     {
-                        label: 'Cancel Match',
+                        label: 'خروج از ثبت زنده',
                         icon: 'close-circle',
                         onPress: () => {
-                            toast.info('Match cancelled');
                             navigation.goBack();
                         },
                         destructive: true,
@@ -481,114 +497,152 @@ export default function LiveMatchScreen({ route, navigation }: LiveMatchScreenPr
                 ]}
             />
         </View>
-
-            );
+    );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        // backgroundColor: COLORS.background,
-        // padding: 16,
     },
     scrollContainer: {
         flex: 1,
-        padding: 16,
+        padding: spacing.md,
     },
     card: {
-        marginBottom: 12,
+        marginBottom: spacing.md,
+        borderRadius: radius.lg,
     },
-    phaseTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        // color: COLORS.text,
+    phaseHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
     },
-    phaseSubtitle: {
+    phaseBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: palette.navy900,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: radius.pill,
+        gap: 6,
+    },
+    phaseBadgeText: {
+        color: '#FFFFFF',
+        fontFamily: 'Vazirmatn_700Bold',
+        fontSize: 13,
+    },
+    serverText: {
+        fontFamily: 'Vazirmatn_500Medium',
+        fontSize: 13,
+    },
+    quickRallyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: palette.lime200,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: radius.md,
+        marginTop: 10,
+        gap: 6,
+    },
+    quickRallyText: {
+        color: palette.navy900,
+        fontFamily: 'Vazirmatn_700Bold',
+        fontSize: 12,
+    },
+    sectionTitle: {
+        fontFamily: 'Vazirmatn_700Bold',
         fontSize: 14,
-        color: COLORS.textSecondary,
-        marginTop: 4,
+        textAlign: 'right',
+        marginBottom: 10,
     },
-    buttonGroup: {
+    buttonGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+        gap: 8,
     },
-    button: {
+    actionButton: {
         flex: 1,
-        margin: 4,
-        minWidth: '45%',
+        minWidth: '46%',
+        borderRadius: radius.md,
+    },
+    actionButtonLabel: {
+        fontFamily: 'Vazirmatn_700Bold',
+        fontSize: 13,
     },
     successButton: {
-        backgroundColor: COLORS.success,
+        backgroundColor: '#2E7D32',
     },
     warningButton: {
-        backgroundColor: COLORS.warning,
+        backgroundColor: '#E65100',
     },
     errorButton: {
-        backgroundColor: COLORS.error,
+        backgroundColor: '#C62828',
+    },
+    neutralButton: {
+        backgroundColor: palette.navy800,
     },
     controlButtons: {
         flexDirection: 'row',
-        marginBottom: 16,
+        gap: 12,
+        marginVertical: spacing.md,
     },
     controlButton: {
         flex: 1,
-        margin: 4,
+        borderRadius: radius.md,
+    },
+    controlButtonText: {
+        fontFamily: 'Vazirmatn_700Bold',
+        fontSize: 13,
     },
     endButton: {
-        backgroundColor: COLORS.error,
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    pointSummary: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
-        marginVertical: 2,
+        backgroundColor: '#C62828',
     },
     timelineCard: {
-        marginBottom: 12,
-        padding: 16,
+        marginBottom: 32,
+        padding: spacing.md,
+        borderRadius: radius.lg,
     },
     timelineHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
+        gap: 8,
+        marginBottom: 12,
         paddingBottom: 8,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border || '#E0E0E0',
+        borderBottomColor: dsColors.border,
     },
     timelineTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginLeft: 8,
+        fontSize: 15,
+        fontFamily: 'Vazirmatn_700Bold',
     },
     emptyTimeline: {
         alignItems: 'center',
-        paddingVertical: 24,
+        paddingVertical: 20,
+        gap: 8,
     },
     emptyText: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
-        marginTop: 8,
+        fontSize: 13,
+        fontFamily: 'Vazirmatn_400Regular',
     },
     timelineList: {
-        paddingLeft: 8, // فضا برای خط عمودی
+        paddingRight: 6,
     },
     timelineItem: {
         flexDirection: 'row',
-        marginBottom: 16,
+        alignItems: 'center',
+        marginBottom: 14,
         position: 'relative',
     },
     timelineLine: {
         position: 'absolute',
-        left: 15, // تنظیم دقیق برای وسط‌چین شدن با دایره
-        top: 32,
-        bottom: -20,
+        right: 15,
+        top: 28,
+        bottom: -18,
         width: 2,
-        backgroundColor: COLORS.border || '#E0E0E0',
+        backgroundColor: dsColors.border,
     },
     timelineDot: {
         width: 32,
@@ -600,16 +654,17 @@ const styles = StyleSheet.create({
     },
     timelineContent: {
         flex: 1,
-        marginLeft: 12,
-        justifyContent: 'center',
+        marginRight: 12,
+        alignItems: 'flex-start',
     },
     timelineWinner: {
-        fontSize: 15,
-        fontWeight: 'bold',
+        fontSize: 14,
+        fontFamily: 'Vazirmatn_700Bold',
     },
     timelineScore: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
+        fontSize: 12,
+        color: '#666',
+        fontFamily: 'Vazirmatn_400Regular',
         marginTop: 2,
     },
 });

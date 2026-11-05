@@ -3,7 +3,8 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, Card, Chip } from 'react-native-paper';
 import { VALID_VALUES, COLORS } from '../../utils/constants';
 import { TennisHelpers } from '../../utils/tennisLogic';
-import {useTheme} from "../../context/ThemeContext";
+import { useTheme } from '../../context/ThemeContext';
+import { colors as dsColors, palette, radius, spacing } from '@tennis-platform/design-system';
 
 interface FinalStrokeFormProps {
     onSubmit: (data: {
@@ -18,17 +19,16 @@ interface FinalStrokeFormProps {
 }
 
 export const FinalStrokeForm: React.FC<FinalStrokeFormProps> = ({
-                                                                    onSubmit,
-                                                                    onCancel,
-                                                                    studentName = 'Student',
-                                                                    opponentName = 'Opponent'
-                                                                }) => {
+    onSubmit,
+    onCancel,
+    studentName = 'شاگرد',
+    opponentName = 'حریف'
+}) => {
     const [player, setPlayer] = useState<'student' | 'opponent' | null>(null);
     const [strokeType, setStrokeType] = useState<string | null>(null);
     const [direction, setDirection] = useState<string | null>(null);
     const [result, setResult] = useState<string | null>(null);
     const { colors } = useTheme();
-
 
     const handleSubmit = () => {
         if (player && strokeType && direction && result) {
@@ -41,84 +41,116 @@ export const FinalStrokeForm: React.FC<FinalStrokeFormProps> = ({
         }
     };
 
-    const isComplete = player && strokeType && direction && result;
+    const isComplete = Boolean(player && strokeType && direction && result);
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={true}>
-            <Card style={[styles.card,{backgroundColor:colors.surface}]}>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+            <Card style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Card.Content>
-                    <Text style={[styles.title,{color:colors.text}]}>Final Stroke</Text>
-                    <Text style={styles.subtitle}>
-                        Record the stroke that ended the point
+                    <Text style={[styles.title, { color: colors.text }]}>
+                        ثبت ضربه پایانی و رویداد امتیاز
+                    </Text>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                        تکنیک، تاکتیک و وضعیت خاتمه رالی را مشخص کنید
                     </Text>
 
                     {/* Player Selection */}
-                    <Text style={[styles.label,{color:colors.textSecondary}]}>Who hit the final stroke?</Text>
+                    <Text style={[styles.label, { color: colors.text }]}>
+                        ضربه نهایی توسط چه بازیکنی زده شد؟
+                    </Text>
                     <View style={styles.chipGroup}>
                         <Chip
                             selected={player === 'student'}
                             onPress={() => setPlayer('student')}
-                            style={styles.chip}
+                            style={[
+                                styles.chip,
+                                player === 'student' && styles.selectedChip
+                            ]}
+                            textStyle={styles.chipText}
                         >
-                            {studentName}
+                            {studentName} (شاگرد)
                         </Chip>
                         <Chip
                             selected={player === 'opponent'}
                             onPress={() => setPlayer('opponent')}
-                            style={styles.chip}
+                            style={[
+                                styles.chip,
+                                player === 'opponent' && styles.selectedChip
+                            ]}
+                            textStyle={styles.chipText}
                         >
-                            {opponentName}
+                            {opponentName} (حریف)
                         </Chip>
                     </View>
 
-                    {/* Stroke Type */}
-                    <Text style={[styles.label,{color:colors.textSecondary}]}>Stroke Type</Text>
+                    {/* Stroke Type (Techniques) */}
+                    <Text style={[styles.label, { color: colors.text }]}>
+                        تکنیک ضربه (نوع ضربه)
+                    </Text>
                     <View style={styles.chipGroup}>
                         {VALID_VALUES.stroke_types.map((type) => (
                             <Chip
                                 key={type}
                                 selected={strokeType === type}
                                 onPress={() => setStrokeType(type)}
-                                style={styles.chip}
+                                style={[
+                                    styles.chip,
+                                    strokeType === type && styles.selectedChip
+                                ]}
+                                textStyle={styles.chipText}
                             >
                                 {TennisHelpers.getStrokeTypeDisplayName(type as any)}
                             </Chip>
                         ))}
                     </View>
 
-                    {/* Direction */}
-                    <Text style={[styles.label,{color:colors.textSecondary}]}>Direction</Text>
+                    {/* Direction (Tactics) */}
+                    <Text style={[styles.label, { color: colors.text }]}>
+                        تاکتیک و جهت ضربه
+                    </Text>
                     <View style={styles.chipGroup}>
                         {VALID_VALUES.directions.map((dir) => (
                             <Chip
                                 key={dir}
                                 selected={direction === dir}
                                 onPress={() => setDirection(dir)}
-                                style={styles.chip}
+                                style={[
+                                    styles.chip,
+                                    direction === dir && styles.selectedChip
+                                ]}
+                                textStyle={styles.chipText}
                             >
                                 {TennisHelpers.getDirectionDisplayName(dir as any)}
                             </Chip>
                         ))}
                     </View>
 
-                    {/* Result */}
-                    <Text style={[styles.label,{color:colors.textSecondary}]}>Result</Text>
+                    {/* Result (States) */}
+                    <Text style={[styles.label, { color: colors.text }]}>
+                        حالت و وضعیت پایان امتیاز
+                    </Text>
                     <View style={styles.chipGroup}>
-                        {VALID_VALUES.final_stroke_results.map((res) => (
-                            <Chip
-                                key={res}
-                                selected={result === res}
-                                onPress={() => setResult(res)}
-                                style={[
-                                    styles.chip,
-                                    res === 'winner' && styles.winnerChip,
-                                    (res === 'forced_error' || res === 'unforced_error' || res === 'net') &&
-                                    styles.errorChip
-                                ]}
-                            >
-                                {TennisHelpers.getFinalStrokeResultDisplayName(res as any)}
-                            </Chip>
-                        ))}
+                        {VALID_VALUES.final_stroke_results.map((res) => {
+                            const isWinner = res === 'winner' || res === 'forced_error';
+                            const isSelected = result === res;
+                            return (
+                                <Chip
+                                    key={res}
+                                    selected={isSelected}
+                                    onPress={() => setResult(res)}
+                                    style={[
+                                        styles.chip,
+                                        isSelected && (isWinner ? styles.winnerChip : styles.errorChip)
+                                    ]}
+                                    textStyle={[
+                                        styles.chipText,
+                                        isSelected && { fontWeight: '700' }
+                                    ]}
+                                >
+                                    {TennisHelpers.getFinalStrokeResultDisplayName(res as any)}
+                                </Chip>
+                            );
+                        })}
                     </View>
 
                     {/* Buttons */}
@@ -127,16 +159,18 @@ export const FinalStrokeForm: React.FC<FinalStrokeFormProps> = ({
                             mode="outlined"
                             onPress={onCancel}
                             style={styles.button}
+                            labelStyle={styles.buttonLabel}
                         >
-                            Cancel
+                            انصراف
                         </Button>
                         <Button
                             mode="contained"
                             onPress={handleSubmit}
                             disabled={!isComplete}
-                            style={[styles.button, styles.submitButton]}
+                            style={[styles.button, isComplete ? styles.submitButton : styles.disabledButton]}
+                            labelStyle={[styles.buttonLabel, { color: isComplete ? '#FFFFFF' : '#888' }]}
                         >
-                            Save Point
+                            ثبت امتیاز (Save Point)
                         </Button>
                     </View>
                 </Card.Content>
@@ -150,50 +184,78 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     card: {
-        marginBottom: 12,
-        // backgroundColor: COLORS.surface,
+        marginBottom: 16,
+        borderRadius: radius.lg,
+        borderWidth: 1,
     },
     title: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        textAlign: 'right',
+        fontFamily: 'Vazirmatn_700Bold',
         marginBottom: 4,
     },
     subtitle: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
+        fontSize: 13,
+        textAlign: 'right',
+        fontFamily: 'Vazirmatn_400Regular',
         marginBottom: 16,
     },
     label: {
         fontSize: 14,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginTop: 12,
+        fontWeight: '700',
+        textAlign: 'right',
+        fontFamily: 'Vazirmatn_700Bold',
+        marginTop: 14,
         marginBottom: 8,
     },
     chipGroup: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+        justifyContent: 'flex-start',
+        gap: 6,
         marginBottom: 8,
     },
     chip: {
-        margin: 4,
+        marginVertical: 3,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: dsColors.border,
+        backgroundColor: dsColors.surface,
+    },
+    selectedChip: {
+        backgroundColor: palette.lime200,
+        borderColor: palette.navy800,
     },
     winnerChip: {
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#D1F2D9',
+        borderColor: '#2E7D32',
     },
     errorChip: {
-        backgroundColor: '#FFEBEE',
+        backgroundColor: '#FFDEDF',
+        borderColor: '#C62828',
+    },
+    chipText: {
+        fontFamily: 'Vazirmatn_500Medium',
+        fontSize: 12,
     },
     buttonGroup: {
         flexDirection: 'row',
-        marginTop: 16,
+        gap: 12,
+        marginTop: 20,
     },
     button: {
         flex: 1,
-        margin: 4,
+        borderRadius: radius.md,
+    },
+    buttonLabel: {
+        fontFamily: 'Vazirmatn_700Bold',
+        fontSize: 14,
     },
     submitButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: palette.navy900,
+    },
+    disabledButton: {
+        backgroundColor: '#E0E0E0',
     },
 });

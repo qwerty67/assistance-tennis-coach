@@ -9,6 +9,8 @@ class Student(Base):
     __tablename__ = "students"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    coach_id = Column(String(36), nullable=True, index=True)
+    user_id = Column(String(36), nullable=True)
     first_name = Column(String(80), nullable=False, default="")
     last_name = Column(String(80), nullable=False, default="")
     phone = Column(String(20), nullable=True)

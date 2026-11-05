@@ -1,3 +1,4 @@
 packages:
   - 'products/*/mobile'
   - 'packages/*'
+  - 'packages/design-system'

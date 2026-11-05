@@ -9,7 +9,9 @@ import { colors } from '@/shared/theme';
 export default function StudentLayout() {
   const { status, user } = useAuth();
   useEffect(() => {
-    if (user?.role === 'student') registerForPush();
+    if (user?.role === 'student') {
+      registerForPush().catch(() => {});
+    }
   }, [user?.role]);
   if (status !== 'authenticated') return <Redirect href="/login" />;
   if (user?.role !== 'student') return <Redirect href="/" />;
